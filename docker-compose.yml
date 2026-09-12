@@ -1,0 +1,39 @@
+services:
+  # Production: `docker compose up web` — builds the standalone image and
+  # serves the optimized build on port 3000.
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  # Development: `docker compose up dev` — runs `next dev` inside the
+  # container with the source bind-mounted, so edits on the host hot-reload
+  # without rebuilding the image. node_modules stays in a named volume so
+  # the host's (possibly different-OS) node_modules never shadows it.
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: deps
+    working_dir: /app
+    # The bind mount below shadows the image's /app, including the
+    # node_modules `npm ci` just installed at build time — so this reinstalls
+    # into the named volume on start. `npm install` (not `ci`) so repeat
+    # starts, where the volume already has a matching install, are fast.
+    command: sh -c "npm install && npm run dev"
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - WATCHPACK_POLLING=true
+    volumes:
+      - .:/app
+      - dev_node_modules:/app/node_modules
+      - dev_next_cache:/app/.next
+
+volumes:
+  dev_node_modules:
+  dev_next_cache:
