@@ -2,7 +2,7 @@
 // through server-side, so wiring in a real destination later is a one-line
 // env var change rather than a code change.
 
-export type LeadKind = "wholesale" | "newsletter";
+export type LeadKind = "wholesale" | "newsletter" | "order";
 
 const WEBHOOK_TIMEOUT_MS = 5000;
 

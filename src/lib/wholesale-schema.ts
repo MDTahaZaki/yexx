@@ -1,8 +1,10 @@
 import { z } from "zod";
+import { indianMobileSchema } from "./phone";
 
 export const wholesaleSchema = z.object({
   name: z.string().trim().min(2, "Enter your full name"),
   email: z.string().trim().email("Enter a valid email address"),
+  phone: indianMobileSchema,
   businessName: z.string().trim().min(2, "Enter a business name"),
   monthlyVolume: z.string().trim().min(1, "Select an estimated monthly volume"),
   notes: z.string().trim().max(2000, "Keep notes under 2000 characters").optional(),

@@ -22,6 +22,7 @@ export default function WholesaleForm() {
     const values = {
       name: String(formData.get("name") ?? ""),
       email: String(formData.get("email") ?? ""),
+      phone: String(formData.get("phone") ?? ""),
       businessName: String(formData.get("businessName") ?? ""),
       monthlyVolume: String(formData.get("monthlyVolume") ?? ""),
       notes: String(formData.get("notes") ?? ""),
@@ -33,6 +34,7 @@ export default function WholesaleForm() {
       setErrors({
         name: fieldErrors.name?.[0],
         email: fieldErrors.email?.[0],
+        phone: fieldErrors.phone?.[0],
         businessName: fieldErrors.businessName?.[0],
         monthlyVolume: fieldErrors.monthlyVolume?.[0],
         notes: fieldErrors.notes?.[0],
@@ -62,6 +64,7 @@ export default function WholesaleForm() {
         setErrors({
           name: body.errors.name?.[0],
           email: body.errors.email?.[0],
+          phone: body.errors.phone?.[0],
           businessName: body.errors.businessName?.[0],
           monthlyVolume: body.errors.monthlyVolume?.[0],
           notes: body.errors.notes?.[0],
@@ -121,6 +124,14 @@ export default function WholesaleForm() {
               </label>
               <input id="email" name="email" type="email" className={inputClass} />
               {errors.email && <p className="mt-2 text-xs text-black/70">{errors.email}</p>}
+            </div>
+
+            <div>
+              <label htmlFor="phone" className="mb-2 block text-xs tracking-[0.2em] uppercase">
+                Phone
+              </label>
+              <input id="phone" name="phone" type="tel" inputMode="numeric" className={inputClass} />
+              {errors.phone && <p className="mt-2 text-xs text-black/70">{errors.phone}</p>}
             </div>
 
             <div>

@@ -23,6 +23,7 @@ interface CartContextValue {
   addItem: (sizeId: SizeId, quantity: number) => void;
   updateQuantity: (sizeId: SizeId, quantity: number) => void;
   removeItem: (sizeId: SizeId) => void;
+  clearCart: () => void;
   subtotal: number;
   totalCount: number;
 }
@@ -71,6 +72,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       removeItem: (sizeId) => {
         setItems((prev) => prev.filter((i) => i.sizeId !== sizeId));
       },
+      clearCart: () => setItems([]),
       subtotal: lines.reduce((sum, line) => sum + line.lineTotal, 0),
       totalCount: items.reduce((sum, item) => sum + item.quantity, 0),
     };

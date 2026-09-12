@@ -99,9 +99,9 @@ export const sizes = [
 export type SizeId = (typeof sizes)[number]["id"];
 
 export const socials = [
-  { label: "Instagram", href: "#" },
-  { label: "TikTok", href: "#" },
-  { label: "X", href: "#" },
+  { label: "Instagram", href: "#" }, // TODO(client): real Instagram URL
+  { label: "WhatsApp", href: "#" }, // TODO(client): real WhatsApp link, e.g. wa.me/91...
+  { label: "X", href: "#" }, // TODO(client): real X URL
 ] as const;
 
 // Type scale — huge uppercase headline type, tight tracking, line-height under 0.9 for display sizes.
