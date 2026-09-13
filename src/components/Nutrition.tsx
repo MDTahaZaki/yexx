@@ -5,6 +5,7 @@ import { getNutritionForVolume, type, layout } from "@/config/brand";
 import { useProduct } from "@/lib/product-context";
 import MaskedLines from "./MaskedLines";
 import CountUpNumber from "./CountUpNumber";
+import Parallax from "./Parallax";
 
 export default function Nutrition() {
   const { selectedSize } = useProduct();
@@ -23,6 +24,7 @@ export default function Nutrition() {
           <p className={`${type.eyebrow} text-white/50`}>Per {selectedSize.volumeMl}mL serving</p>
         </div>
 
+        <Parallax rangePx={16}>
         <motion.table
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
@@ -58,6 +60,7 @@ export default function Nutrition() {
             ))}
           </tbody>
         </motion.table>
+        </Parallax>
       </div>
     </section>
   );

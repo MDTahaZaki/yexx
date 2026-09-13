@@ -2,7 +2,9 @@
 
 import { motion, type Variants } from "framer-motion";
 import { pillars, type, layout } from "@/config/brand";
+import { pillarImages } from "@/lib/product-images";
 import { CleanEnergyIcon, FocusIcon, PerformanceIcon } from "./icons";
+import RevealImage from "./RevealImage";
 
 const pillarIcons = [CleanEnergyIcon, FocusIcon, PerformanceIcon];
 
@@ -29,12 +31,24 @@ export default function Pillars() {
         >
           {pillars.map((p, i) => {
             const Icon = pillarIcons[i];
+            const photo = pillarImages[i];
             return (
               <motion.div
                 key={p.id}
                 variants={item}
                 className="flex flex-col gap-6 border-b border-black/15 px-0 py-12 md:border-b-0 md:px-10 md:first:pl-0 lg:px-14"
               >
+                <RevealImage
+                  imageProps={{
+                    src: photo.src,
+                    alt: "",
+                    width: photo.width,
+                    height: photo.height,
+                    sizes: "(min-width: 768px) 33vw, 90vw",
+                    style: { objectPosition: photo.objectPosition },
+                  }}
+                  wrapperClassName="h-40 w-full grayscale"
+                />
                 <span className="flex h-12 w-12 items-center justify-center rounded-full border border-black/25">
                   <Icon className="h-5 w-5" />
                 </span>

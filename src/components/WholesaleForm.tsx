@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { layout, type } from "@/config/brand";
 import { wholesaleSchema, type WholesaleFieldErrors } from "@/lib/wholesale-schema";
 import MaskedLines from "./MaskedLines";
+import FadeUp from "./FadeUp";
 import SweepButton from "./SweepButton";
 import { SpinnerIcon } from "./icons";
 
@@ -89,10 +90,10 @@ export default function WholesaleForm() {
       <div className={`${layout.container} grid grid-cols-1 gap-16 lg:grid-cols-2`}>
         <div className="flex flex-col justify-center gap-6">
           <MaskedLines as="h2" text="Wholesale" className={`${type.h2} font-bold uppercase`} viewport />
-          <p className="max-w-sm text-sm leading-relaxed text-black/65">
+          <FadeUp viewport className="max-w-sm text-sm leading-relaxed text-black/65">
             Stock YEXX in your store, gym, or venue. Tell us about your business and we&apos;ll
             follow up with pricing and case sizes.
-          </p>
+          </FadeUp>
         </div>
 
         {status === "success" ? (

@@ -3,52 +3,19 @@
 import { motion } from "framer-motion";
 import { brand, layout, type } from "@/config/brand";
 import { grainBackground } from "@/lib/grain";
+import { gridImages } from "@/lib/product-images";
 import MaskedLines from "./MaskedLines";
-
-// Each "look" is a distinct monochrome composition: a gradient direction/
-// origin plus which corner a large ghosted Y mark bleeds off of, so no two
-// tiles read the same even though they share one palette.
-const LOOKS = [
-  {
-    gradient: "radial-gradient(circle at 28% 22%, #3a3a3a 0%, #161616 58%, #050505 100%)",
-    markCorner: "-top-10 -right-8",
-    markRotate: -10,
-  },
-  {
-    gradient: "linear-gradient(135deg, #050505 0%, #2b2b2b 100%)",
-    markCorner: "-bottom-12 -left-10",
-    markRotate: 12,
-  },
-  {
-    gradient: "radial-gradient(circle at 72% 78%, #2c2c2c 0%, #0a0a0a 62%)",
-    markCorner: "-top-10 -left-10",
-    markRotate: 7,
-  },
-  {
-    gradient: "linear-gradient(200deg, #1c1c1c 0%, #050505 55%, #272727 100%)",
-    markCorner: "-bottom-10 -right-10",
-    markRotate: -14,
-  },
-  {
-    gradient: "radial-gradient(circle at 18% 86%, #343434 0%, #0a0a0a 68%)",
-    markCorner: "-top-8 -right-12",
-    markRotate: 5,
-  },
-  {
-    gradient: "linear-gradient(60deg, #0a0a0a 0%, #303030 100%)",
-    markCorner: "-bottom-8 -left-8",
-    markRotate: -6,
-  },
-] as const;
+import Parallax from "./Parallax";
+import RevealImage from "./RevealImage";
 
 const tiles = [
-  { id: 1, span: "col-span-2 row-span-2", tag: "@yexx_official", look: 0 },
-  { id: 2, span: "col-span-1 row-span-1", tag: "@r.torres", look: 1 },
-  { id: 3, span: "col-span-1 row-span-1", tag: "@leah.k", look: 2 },
-  { id: 4, span: "col-span-1 row-span-2", tag: "@danny_lifts", look: 3 },
+  { id: 1, span: "col-span-2 row-span-2", tag: "@yexx_official", image: 0 },
+  { id: 2, span: "col-span-1 row-span-1", tag: "@r.torres", image: 1 },
+  { id: 3, span: "col-span-1 row-span-1", tag: "@leah.k", image: 2 },
+  { id: 4, span: "col-span-1 row-span-2", tag: "@danny_lifts", image: 3 },
   { id: 5, span: "col-span-2 row-span-1", special: true as const },
-  { id: 6, span: "col-span-1 row-span-1", tag: "@marta.codes", look: 4 },
-  { id: 7, span: "col-span-1 row-span-1", tag: "@jules_runs", look: 5 },
+  { id: 6, span: "col-span-1 row-span-1", tag: "@marta.codes", image: 4 },
+  { id: 7, span: "col-span-1 row-span-1", tag: "@jules_runs", image: 5 },
 ];
 
 function TileFrame({
@@ -73,39 +40,53 @@ function TileFrame({
   );
 }
 
-function GrainTile({ id, span, tag, look }: { id: number; span: string; tag: string; look: number }) {
-  const { gradient, markCorner, markRotate } = LOOKS[look];
+function PhotoTile({
+  id,
+  span,
+  tag,
+  image,
+}: {
+  id: number;
+  span: string;
+  tag: string;
+  image: number;
+}) {
+  const photo = gridImages[image];
   return (
     <TileFrame id={id} span={span}>
-      {/* Content layer: gradient + grain + ghost mark, scales up on hover.
-          The scrim/username below sit outside this layer so they don't. */}
+      {/* Real product render. Every can render places its Y-mark logo at
+          about the same vertical band, so a default centered crop looked
+          near-identical across tiles regardless of source file — the
+          explicit per-tile objectPosition below is what actually varies
+          the crop. Scaling this wrapper on hover (not RevealImage's own
+          inner drift layer) keeps the two transforms on separate nodes so
+          they compose instead of one clobbering the other's inline style. */}
+      <RevealImage
+        imageProps={{
+          src: photo.src,
+          alt: "",
+          fill: true,
+          sizes: "(min-width: 768px) 25vw, 50vw",
+          style: { objectPosition: photo.objectPosition },
+        }}
+        position="absolute"
+        wrapperClassName="inset-0 transition-transform duration-500 ease-out group-hover:scale-105"
+      />
       <div
-        className="absolute inset-0 transition-transform duration-500 ease-out group-hover:scale-105"
-        style={{ backgroundImage: gradient }}
-      >
-        <div
-          className="absolute inset-0 opacity-20 mix-blend-overlay"
-          style={{ backgroundImage: grainBackground }}
-          aria-hidden="true"
-        />
-        <span
-          className={`pointer-events-none absolute ${markCorner} font-bold text-white/[0.07] uppercase select-none`}
-          style={{ fontSize: "10rem", lineHeight: 1, transform: `rotate(${markRotate}deg)` }}
-          aria-hidden="true"
-        >
-          Y
-        </span>
-      </div>
+        className="pointer-events-none absolute inset-0 opacity-25 mix-blend-overlay"
+        style={{ backgroundImage: grainBackground }}
+        aria-hidden="true"
+      />
 
       {/* Scrim + username: hidden until hover on a mouse, but hover can never
           fire on a touchscreen, so it's shown by default there instead
           (pointer: coarse, not a screen-width guess — a touch laptop/tablet
           at desktop width has the same problem a phone does). */}
       <div
-        className="absolute inset-x-0 bottom-0 h-2/3 translate-y-full bg-gradient-to-t from-black/85 via-black/30 to-transparent opacity-0 transition-all duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100 pointer-coarse:translate-y-0 pointer-coarse:opacity-100"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 translate-y-full bg-gradient-to-t from-black/85 via-black/30 to-transparent opacity-0 transition-all duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100 pointer-coarse:translate-y-0 pointer-coarse:opacity-100"
         aria-hidden="true"
       />
-      <span className="absolute bottom-3 left-3 translate-y-2 text-[0.65rem] font-light tracking-[0.25em] text-white/80 uppercase opacity-0 transition-all duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100 pointer-coarse:translate-y-0 pointer-coarse:opacity-100">
+      <span className="pointer-events-none absolute bottom-3 left-3 translate-y-2 text-[0.65rem] font-light tracking-[0.25em] text-white/80 uppercase opacity-0 transition-all duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100 pointer-coarse:translate-y-0 pointer-coarse:opacity-100">
         {tag}
       </span>
     </TileFrame>
@@ -139,15 +120,17 @@ export default function SocialGrid() {
           <p className={`${type.eyebrow} text-white/50`}>Tag us to be featured</p>
         </div>
 
-        <div className="grid auto-rows-[140px] grid-cols-2 gap-1 grid-flow-row-dense md:grid-cols-4">
-          {tiles.map((t) =>
-            t.special ? (
-              <TagUsTile key={t.id} id={t.id} span={t.span} />
-            ) : (
-              <GrainTile key={t.id} id={t.id} span={t.span} tag={t.tag!} look={t.look!} />
-            )
-          )}
-        </div>
+        <Parallax rangePx={22}>
+          <div className="grid auto-rows-[140px] grid-cols-2 gap-1 grid-flow-row-dense md:grid-cols-4">
+            {tiles.map((t) =>
+              t.special ? (
+                <TagUsTile key={t.id} id={t.id} span={t.span} />
+              ) : (
+                <PhotoTile key={t.id} id={t.id} span={t.span} tag={t.tag!} image={t.image!} />
+              )
+            )}
+          </div>
+        </Parallax>
       </div>
     </section>
   );

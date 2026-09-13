@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { motion, useMotionValueEvent, useScroll, useSpring, useTransform } from "framer-motion";
 import CanScene from "./CanScene";
 import MaskedLines from "./MaskedLines";
+import FadeUp from "./FadeUp";
 import SweepButton from "./SweepButton";
 import { useCanSupport3D } from "@/lib/use-can-support";
 import { brand, callouts, pillars, type } from "@/config/brand";
@@ -66,7 +67,9 @@ export default function Hero() {
             delay={0.15}
           />
 
-          <p className={`${type.body} max-w-md text-white/70`}>{brand.bio}</p>
+          <FadeUp as="p" delay={0.5} className={`${type.body} max-w-md text-white/70`}>
+            {brand.bio}
+          </FadeUp>
 
           <ul className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs tracking-[0.15em] text-white/60 uppercase">
             {callouts.map((c, i) => (

@@ -2,6 +2,7 @@ import { CartProvider } from "@/lib/cart-context";
 import { ProductProvider } from "@/lib/product-context";
 import Nav from "@/components/Nav";
 import CartDrawer from "@/components/CartDrawer";
+import SmoothScroll from "@/components/SmoothScroll";
 import ScrollProgressBar from "@/components/ScrollProgressBar";
 import Hero from "@/components/Hero";
 import Pillars from "@/components/Pillars";
@@ -16,6 +17,7 @@ export default function Home() {
   return (
     <CartProvider>
       <ProductProvider>
+        <SmoothScroll />
         <ScrollProgressBar />
         <Nav />
         <CartDrawer />

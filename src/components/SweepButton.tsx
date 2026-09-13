@@ -1,4 +1,5 @@
-import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "react";
+import type { AnchorHTMLAttributes, ButtonHTMLAttributes, PointerEvent, ReactNode } from "react";
+import { motion, useMotionValue, useReducedMotion, useSpring } from "framer-motion";
 
 interface SweepButtonBaseProps {
   /** "dark" = black button (sweeps white, text inverts black->white) — for
@@ -13,15 +14,32 @@ interface SweepButtonBaseProps {
   className?: string;
 }
 
+// framer-motion's motion.a/motion.button redeclare onDrag*/onAnimation* with
+// gesture-specific signatures that conflict with the native DOM event
+// handler types of the same name — excluded here since nothing in this
+// component uses the native versions anyway.
+type ConflictingMotionHandlers =
+  | "onDrag"
+  | "onDragStart"
+  | "onDragEnd"
+  | "onAnimationStart"
+  | "onAnimationEnd"
+  | "onAnimationIteration";
+
 type SweepButtonProps =
   | (SweepButtonBaseProps & { href: string } & Omit<
         AnchorHTMLAttributes<HTMLAnchorElement>,
-        "className" | "children"
+        "className" | "children" | ConflictingMotionHandlers
       >)
   | (SweepButtonBaseProps & { href?: undefined } & Omit<
         ButtonHTMLAttributes<HTMLButtonElement>,
-        "className" | "children"
+        "className" | "children" | ConflictingMotionHandlers
       >);
+
+// How far the button drifts toward the cursor, as a fraction of the cursor's
+// offset from center — kept small, this is a "pull," not a chase.
+const MAGNETIC_STRENGTH = 0.25;
+const MAGNETIC_SPRING = { stiffness: 150, damping: 15, mass: 0.2 };
 
 /**
  * The sweep-fill + text-invert hover effect used across the site: a solid
@@ -30,6 +48,11 @@ type SweepButtonProps =
  * pixel-accurate "invert" that doesn't depend on mix-blend-mode support.
  * Renders as an <a> when `href` is given (real navigation, e.g. the hero
  * CTA), otherwise a <button> (form submits, cart actions).
+ *
+ * Also carries a slight magnetic pull toward the cursor — mouse only
+ * (gated on `pointerType === "mouse"`, which a touch or pen input never
+ * reports, so this needs no separate touch-detection query) and skipped
+ * entirely under reduced motion.
  */
 export default function SweepButton({
   variant,
@@ -39,6 +62,23 @@ export default function SweepButton({
   href,
   ...rest
 }: SweepButtonProps) {
+  const shouldReduceMotion = useReducedMotion();
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const springX = useSpring(x, MAGNETIC_SPRING);
+  const springY = useSpring(y, MAGNETIC_SPRING);
+
+  function handlePointerMove(event: PointerEvent<HTMLElement>) {
+    if (shouldReduceMotion || event.pointerType !== "mouse") return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    x.set((event.clientX - (rect.left + rect.width / 2)) * MAGNETIC_STRENGTH);
+    y.set((event.clientY - (rect.top + rect.height / 2)) * MAGNETIC_STRENGTH);
+  }
+  function handlePointerLeave() {
+    x.set(0);
+    y.set(0);
+  }
+
   const base = variant === "dark" ? "bg-black text-white" : "bg-white text-black";
   const sweep = variant === "dark" ? "bg-white" : "bg-black";
   const invertText = variant === "dark" ? "text-black" : "text-white";
@@ -63,19 +103,35 @@ export default function SweepButton({
 
   if (href !== undefined) {
     return (
-      <a href={href} {...(rest as AnchorHTMLAttributes<HTMLAnchorElement>)} className={sharedClassName}>
+      <motion.a
+        href={href}
+        {...(rest as Omit<
+          AnchorHTMLAttributes<HTMLAnchorElement>,
+          "className" | "children" | ConflictingMotionHandlers
+        >)}
+        onPointerMove={handlePointerMove}
+        onPointerLeave={handlePointerLeave}
+        style={{ x: springX, y: springY }}
+        className={sharedClassName}
+      >
         {content}
-      </a>
+      </motion.a>
     );
   }
 
   return (
-    <button
+    <motion.button
       type="button"
-      {...(rest as ButtonHTMLAttributes<HTMLButtonElement>)}
+      {...(rest as Omit<
+        ButtonHTMLAttributes<HTMLButtonElement>,
+        "className" | "children" | ConflictingMotionHandlers
+      >)}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
+      style={{ x: springX, y: springY }}
       className={sharedClassName}
     >
       {content}
-    </button>
+    </motion.button>
   );
 }
