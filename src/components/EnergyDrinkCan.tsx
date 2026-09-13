@@ -471,8 +471,18 @@ function createShaftTexture(): THREE.CanvasTexture {
   canvas.height = height;
   const ctx = canvas.getContext("2d")!;
 
+  // A flat, exactly-zero dead zone for the first 20% (not just a fade-in
+  // ramp) before rising to peak brightness. The plane's own geometric top
+  // edge sits just outside the camera's visible frustum at this container's
+  // aspect ratio, so without a dead zone the frustum clips straight through
+  // wherever the ramp happens to be — a slow rise only gets asymptotically
+  // close to zero at that fixed clip point, it never reaches it exactly. A
+  // flat zero span guarantees true-zero alpha anywhere within it, with
+  // generous margin over the actual overshoot.
   const vertical = ctx.createLinearGradient(0, 0, 0, height);
-  vertical.addColorStop(0, "rgba(255,255,255,0.9)");
+  vertical.addColorStop(0, "rgba(255,255,255,0)");
+  vertical.addColorStop(0.2, "rgba(255,255,255,0)");
+  vertical.addColorStop(0.55, "rgba(255,255,255,0.9)");
   vertical.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = vertical;
   ctx.fillRect(0, 0, width, height);
