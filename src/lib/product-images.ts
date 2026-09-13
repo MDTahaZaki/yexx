@@ -1,6 +1,18 @@
 // Single source of truth for where each real product render is used —
 // dimensions come straight from the source files so next/image never has to
 // guess an aspect ratio (avoids layout shift).
+//
+// Every image on the site must show the same can FORMAT — the ten renders
+// in /public/product/ cover eight different shapes (slim, sleek, standard,
+// tallboy, stubby, slim-tall, bullet, straight), and using more than one of
+// them at once makes the site look like it's selling a product that
+// doesn't exist. "slim" (01/02) is the only shape with both a 150ml and a
+// 250ml render — the two sizes actually sold — so it's the placeholder
+// format everywhere below, until the client picks the real one. Swapping
+// formats later means changing the two SLIM_* paths/dimensions here, not
+// touching Shop, Pillars, or SocialGrid.
+const SLIM_150 = { src: "/product/01_slim_150.webp", width: 362, height: 509 };
+const SLIM_250 = { src: "/product/02_slim_250.webp", width: 362, height: 698 };
 
 interface ProductImage {
   src: string;
@@ -9,46 +21,40 @@ interface ProductImage {
 }
 
 interface CroppedProductImage extends ProductImage {
-  /** CSS object-position. Every render places its Y-mark logo at roughly
-   *  the same vertical band, so the *default* (centered) crop looks near-
-   *  identical from tile to tile regardless of which of the ten source
-   *  files is used — explicit, differing positions are what actually
-   *  varies the crop. */
+  /** CSS object-position. Both renders place their lid/logo/wordmark at
+   *  the same proportional height (250ml is the same design, just taller),
+   *  so the default centered crop looks near-identical everywhere it's
+   *  used unless given an explicit, differing position. Vary this to vary
+   *  the framing — never swap in a different shape to do it. */
   objectPosition: string;
 }
 
-// The two can sizes actually sold (see config/brand.ts `sizes`) have a
-// literal same-named render each.
+// The two can sizes actually sold (see config/brand.ts `sizes`) — same
+// shape, different height, per size. Never two different can designs.
 export const shopImages: Record<"150ml" | "250ml", ProductImage> = {
-  "150ml": { src: "/product/01_slim_150.webp", width: 362, height: 509 },
-  "250ml": { src: "/product/02_slim_250.webp", width: 362, height: 698 },
+  "150ml": SLIM_150,
+  "250ml": SLIM_250,
 };
 
-// Six of the eight remaining can-format renders, one per photo tile in the
-// #YEXXYOURWAY grid — deliberately different crops/formats so no two tiles
-// read the same. The other two (05, 10) are reserved for the Pillars detail
-// crops below.
+// One photo tile in the #YEXXYOURWAY grid per entry. Both the 150ml and
+// 250ml slim renders are used across these — same format throughout, the
+// crop/zoom and which of the two sizes is what varies.
 export const gridImages: CroppedProductImage[] = [
-  // The large anchor tile keeps the full Y mark — the one crop where
-  // showing the logo dead-on is the point.
-  { src: "/product/06_tallboy_500.webp", width: 417, height: 845, objectPosition: "50% 45%" },
-  { src: "/product/03_sleek_250.webp", width: 383, height: 610, objectPosition: "50% 8%" }, // lid/rim
-  { src: "/product/09_bullet_250.webp", width: 362, height: 698, objectPosition: "50% 88%" }, // wordmark/base
-  { src: "/product/08_slim_tall_330.webp", width: 383, height: 845, objectPosition: "50% 55%" }, // full body (tall tile, less cropping)
-  { src: "/product/04_sleek_330.webp", width: 383, height: 749, objectPosition: "50% 20%" }, // shoulder taper
-  { src: "/product/07_stubby_200.webp", width: 404, height: 505, objectPosition: "50% 70%" }, // lower body
+  { ...SLIM_250, objectPosition: "50% 45%" }, // large anchor tile — Y mark, full logo dead-on
+  { ...SLIM_150, objectPosition: "50% 8%" }, // lid/rim
+  { ...SLIM_250, objectPosition: "50% 88%" }, // wordmark/base
+  { ...SLIM_250, objectPosition: "50% 58%" }, // full body (tall tile, less cropping)
+  { ...SLIM_150, objectPosition: "50% 20%" }, // shoulder taper
+  { ...SLIM_150, objectPosition: "50% 72%" }, // lower body
 ];
 
-// Tightly-cropped detail shot beside each pillar. None of the ten renders
+// Tightly-cropped detail shot beside each pillar. None of the renders
 // actually show condensation (they're clean studio-style CGI, not the
 // photoreal splash/condensation shots the brief described) — the first
-// entry crops in on the body's specular highlight as the closest available
+// entry crops in on the wordmark/base band as the closest available
 // stand-in, called out honestly rather than mislabeled.
 export const pillarImages: CroppedProductImage[] = [
-  // Cropped low, on the wordmark/base band — the Y mark dominates the mid-
-  // body on every render, so a crop anywhere near it looked identical to
-  // the "Y mark" pillar below; this stays visually distinct from both.
-  { src: "/product/05_standard_330.webp", width: 417, height: 623, objectPosition: "50% 92%" }, // body/base — condensation stand-in
-  { src: "/product/10_straight_250.webp", width: 375, height: 665, objectPosition: "50% 40%" }, // Y mark
-  { src: "/product/06_tallboy_500.webp", width: 417, height: 845, objectPosition: "50% 6%" }, // lid/rim
+  { ...SLIM_150, objectPosition: "50% 92%" }, // wordmark/base — condensation stand-in
+  { ...SLIM_250, objectPosition: "50% 40%" }, // Y mark
+  { ...SLIM_150, objectPosition: "50% 6%" }, // lid/rim
 ];
