@@ -7,7 +7,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type ReactNode,
   type RefObject,
 } from "react";
@@ -362,97 +361,17 @@ function CanSizeGroup({ dropletCount }: { dropletCount: number }) {
   );
 }
 
-// Single-finger horizontal drag, mobile-tier only (see `touchEnabled` at the
-// call site — desktop's OrbitControls already covers mouse/multi-touch
-// orbit). Reads the horizontal delta in CSS pixels off raw TouchEvents
-// attached directly to the canvas, not R3F's own pointer events, because
-// those don't give a pixel-width-relative delta without extra bookkeeping.
-// `touch-action: pan-y` — set on the Canvas via a `style` prop at the call
-// site, not mutated here — is what actually keeps page scroll working: it
-// tells the browser vertical drags on this element are its own native
-// scroll, so these handlers only ever see/need the horizontal delta; they
-// never call preventDefault, so a diagonal drag both rotates and scrolls.
-const DRAG_RADIANS_PER_PIXEL = 0.012;
-const DRAG_VELOCITY_DAMPING = 0.93; // per-frame decay once released — a second or so of momentum
-const DRAG_RETURN_LERP = 0.03; // slow constant pull back toward front-facing (0)
-const DRAG_MOMENTUM_STOP_EPS = 0.0001;
-
-function useCanTouchDrag(enabled: boolean) {
-  const { gl } = useThree();
-  const dragOffsetRef = useRef(0);
-  const velocityRef = useRef(0);
-  const draggingRef = useRef(false);
-
-  useEffect(() => {
-    if (!enabled) return;
-    const canvas = gl.domElement;
-
-    let lastX = 0;
-    let lastT = 0;
-
-    const onTouchStart = (event: TouchEvent) => {
-      if (event.touches.length !== 1) return;
-      draggingRef.current = true;
-      velocityRef.current = 0;
-      lastX = event.touches[0].clientX;
-      lastT = performance.now();
-    };
-    const onTouchMove = (event: TouchEvent) => {
-      if (!draggingRef.current || event.touches.length !== 1) return;
-      const x = event.touches[0].clientX;
-      const now = performance.now();
-      const dt = Math.max(1, now - lastT);
-      const angleDelta = (x - lastX) * DRAG_RADIANS_PER_PIXEL;
-      dragOffsetRef.current += angleDelta;
-      // Normalized to "radians this would cover in one ~60fps frame" so the
-      // momentum decay loop in useFrame (a per-frame multiply) starts from
-      // a magnitude that's comparable frame to frame regardless of the
-      // touchmove event's own irregular timing.
-      velocityRef.current = (angleDelta / dt) * 16.67;
-      lastX = x;
-      lastT = now;
-    };
-    const onTouchEnd = () => {
-      draggingRef.current = false;
-    };
-
-    canvas.addEventListener("touchstart", onTouchStart, { passive: true });
-    canvas.addEventListener("touchmove", onTouchMove, { passive: true });
-    canvas.addEventListener("touchend", onTouchEnd, { passive: true });
-    canvas.addEventListener("touchcancel", onTouchEnd, { passive: true });
-    return () => {
-      canvas.removeEventListener("touchstart", onTouchStart);
-      canvas.removeEventListener("touchmove", onTouchMove);
-      canvas.removeEventListener("touchend", onTouchEnd);
-      canvas.removeEventListener("touchcancel", onTouchEnd);
-    };
-  }, [enabled, gl]);
-
-  return { dragOffsetRef, velocityRef, draggingRef };
-}
-
 /**
  * Idle motion is a gentle +/-15 degree sway around front-facing, not a
  * continuous rotation — the label must stay readable, not spin away from the
  * viewer. A full 360 is only ever a brief, explicitly-triggered flourish
  * (see `triggerCanSpin`), layered on top of the sway and then handed back to
  * it once complete. A slow bob + drift on position runs alongside the sway
- * so the can never looks frozen at rest. On the mobile tier (`touchEnabled`),
- * a single-finger horizontal drag adds a Y-rotation offset on top of all of
- * that, with momentum on release that eases back toward 0 (see
- * `useCanTouchDrag`) — desktop keeps OrbitControls instead (see the
- * `!isReduced` gate around it in EnergyDrinkCan).
+ * so the can never looks frozen at rest.
  */
-function SpinningCan({
-  dropletCount,
-  touchEnabled = false,
-}: {
-  dropletCount: number;
-  touchEnabled?: boolean;
-}) {
+function SpinningCan({ dropletCount }: { dropletCount: number }) {
   const group = useRef<THREE.Group>(null);
   const flourish = useRef(0); // 0 = idle; while active, counts 0 -> 1 across FLOURISH_SPIN_DURATION
-  const { dragOffsetRef, velocityRef, draggingRef } = useCanTouchDrag(touchEnabled);
 
   useEffect(() => onCanSpin(() => {
     flourish.current = Number.EPSILON; // >0 marks "in progress"; useFrame drives it from here
@@ -474,17 +393,7 @@ function SpinningCan({
       }
     }
 
-    if (touchEnabled && !draggingRef.current) {
-      if (Math.abs(velocityRef.current) > DRAG_MOMENTUM_STOP_EPS) {
-        dragOffsetRef.current += velocityRef.current;
-        velocityRef.current *= DRAG_VELOCITY_DAMPING;
-      } else {
-        velocityRef.current = 0;
-      }
-      dragOffsetRef.current = THREE.MathUtils.lerp(dragOffsetRef.current, 0, DRAG_RETURN_LERP);
-    }
-
-    group.current.rotation.y = sway + extra + (touchEnabled ? dragOffsetRef.current : 0);
+    group.current.rotation.y = sway + extra;
     group.current.position.y = BOB_AMPLITUDE * Math.sin(t * BOB_SPEED);
     group.current.position.x = DRIFT_AMPLITUDE * Math.sin(t * DRIFT_SPEED_X);
     group.current.position.z = DRIFT_AMPLITUDE * Math.cos(t * DRIFT_SPEED_Z);
@@ -713,476 +622,6 @@ function AreaFillLight() {
   );
 }
 
-// --- Theatrical spotlight rig -------------------------------------------
-// Stage-style beams sweeping down from above and converging on the can.
-// Full-quality tier only (see `!isReduced` at the call site) — this never
-// mounts on the reduced mobile tier or the static poster, and since the
-// static tier is also what `useCanSupport3D` falls back to under
-// prefers-reduced-motion, that case is covered for free.
-
-// A lit 3D cone (fresnel edge fade via a custom ShaderMaterial) was the
-// first attempt here, but a low-poly open cone stretched hugely non-
-// uniformly (thin radius, long length) plus DoubleSide plus additive
-// blending produced a hard-edged rectangular ghost across the whole hero —
-// two coincident near/far tube walls adding together into a flat, sharp-
-// edged panel instead of a soft shaft. Rebuilt as a camera-facing textured
-// "billboard" plane instead: the exact visible shape (tight bright core,
-// soft halo, sharp length falloff, a bright hotspot at the lamp end) is
-// baked into the texture's alpha channel once, at full control, with no
-// per-angle lighting-shader edge cases left to go wrong. The plane is
-// locked to the source->target axis but still always faces the camera
-// around that axis (the same construction used for laser/trail billboards),
-// so it reads as a correctly-foreshortened 3D shaft from any angle
-// OrbitControls allows, never a flat cutout.
-const BEAM_TEXTURE_W = 96;
-const BEAM_TEXTURE_H = 384;
-// Fraction of the beam's length (0 = source, 1 = target) where visible
-// brightness has fully died out — stage beams read as a defined shaft with
-// an end, not an infinite soft gradient reaching all the way to the floor.
-const BEAM_FADE_CUTOFF = 0.6;
-const BEAM_FADE_POWER = 2.2;
-// Alpha at the very source, before the small lamp hotspot is added on top —
-// the "0.25-0.35" the beam should read as away from that hotspot.
-const BEAM_BODY_PEAK_ALPHA = 0.34;
-const BEAM_HOTSPOT_PEAK_ALPHA = 0.85;
-
-/** The beam's entire visible shape — taper, tight core, soft halo, sharp
- *  length falloff, and a bright hotspot at the source end — baked once into
- *  a texture's alpha channel. `flipY = false` so texture row 0 (drawn as
- *  the bright end below) lands at the plane's local -Y, which the per-frame
- *  orientation below always points at the beam's actual source. */
-function createBeamTexture(): THREE.CanvasTexture {
-  const w = BEAM_TEXTURE_W;
-  const h = BEAM_TEXTURE_H;
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d")!;
-  const image = ctx.createImageData(w, h);
-  const data = image.data;
-  const cx = w / 2;
-
-  for (let y = 0; y < h; y++) {
-    const v = y / (h - 1); // 0 = source (bright end), 1 = target (floor end)
-    const lengthFade =
-      v >= BEAM_FADE_CUTOFF ? 0 : Math.pow(1 - v / BEAM_FADE_CUTOFF, BEAM_FADE_POWER);
-    // Half-width still grows the whole way down (keeps the taper reading as
-    // a cone), even though alpha is already 0 well before the target end.
-    const halfWidthPx = Math.max(1, THREE.MathUtils.lerp(0.055, 0.5, v) * cx);
-    const hotspot = Math.exp(-((v / 0.035) ** 2));
-
-    for (let x = 0; x < w; x++) {
-      const dx = Math.abs(x - cx);
-      const core = Math.exp(-((dx / (halfWidthPx * 0.22)) ** 2));
-      const halo = Math.exp(-((dx / (halfWidthPx * 0.95)) ** 2)) * 0.45;
-      const bodyShape = Math.min(1, core + halo);
-      const hotspotShape = hotspot * Math.exp(-((dx / (halfWidthPx * 0.55)) ** 2));
-
-      const alpha = Math.min(
-        1,
-        bodyShape * lengthFade * BEAM_BODY_PEAK_ALPHA + hotspotShape * BEAM_HOTSPOT_PEAK_ALPHA
-      );
-
-      const idx = (y * w + x) * 4;
-      data[idx] = 255;
-      data[idx + 1] = 255;
-      data[idx + 2] = 255;
-      data[idx + 3] = Math.round(alpha * 255);
-    }
-  }
-
-  ctx.putImageData(image, 0, 0);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.flipY = false;
-  texture.premultiplyAlpha = false;
-  texture.needsUpdate = true;
-  return texture;
-}
-
-/** Small radial hotspot sprite pinned to each beam's source point — a
- *  dedicated "the lamp itself is visible" glint, independent of the beam
- *  texture's own hotspot so it stays crisp at any beam width. Sprites are
- *  always fully camera-facing with no normals/edge math at all, so this
- *  carries none of the risk the old lit-cone approach did. */
-function createLampGlowTexture(): THREE.CanvasTexture {
-  const size = 64;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d")!;
-  const r = size / 2;
-  const gradient = ctx.createRadialGradient(r, r, 0, r, r, r);
-  gradient.addColorStop(0, "rgba(255,255,255,0.95)");
-  gradient.addColorStop(0.35, "rgba(255,255,255,0.45)");
-  gradient.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, size, size);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
-
-const BEAM_LIGHT_INTENSITY = 2.4;
-const BEAM_TARGET_Y = 0.15; // roughly the can's vertical center, slightly toward the label
-
-interface BeamConfig {
-  baseAzimuthDeg: number;
-  orbitRadius: number;
-  orbitHeight: number;
-  /** World-space width of the beam plane at its widest (target) end —
-   *  narrow: these are tight shafts, not wide cones. */
-  baseWidth: number;
-  sweepAmpDeg: number;
-  periodSec: number;
-  phase: number;
-  flickerFreqHz: number;
-  flickerPhase: number;
-  wanderAmp: number;
-  wanderPeriodSec: number;
-  wanderPhase: number;
-}
-
-// Five beams, deliberately uneven in every parameter — angle, distance,
-// height, width, and every timing constant. Even spacing or matching
-// periods is what makes a sweep rig read as a mechanical pattern instead of
-// independent lamps; periods are irregular decimals within the 10-18s
-// window specifically so no two beams ever fall back into phase.
-const BEAM_CONFIGS: BeamConfig[] = [
-  {
-    // orbitHeight is deliberately kept within the camera's visible vertical
-    // range (roughly +-1.3 world units at this depth/fov) — a source placed
-    // above that, off-frame, means the on-screen part of the beam is only
-    // ever the already-faded tail, which is what made the first pass
-    // invisible: the fade fraction is measured from the (invisible) source,
-    // so a beam whose source never appears on screen just reads as gone.
-    baseAzimuthDeg: -58,
-    orbitRadius: 0.85,
-    orbitHeight: 1.15,
-    baseWidth: 0.24,
-    sweepAmpDeg: 26,
-    periodSec: 11.3,
-    phase: 0.4,
-    flickerFreqHz: 0.72,
-    flickerPhase: 0.6,
-    wanderAmp: 0.1,
-    wanderPeriodSec: 6.3,
-    wanderPhase: 0.2,
-  },
-  {
-    baseAzimuthDeg: -21,
-    orbitRadius: 1.15,
-    orbitHeight: 1.4,
-    baseWidth: 0.3,
-    sweepAmpDeg: 31,
-    periodSec: 14.7,
-    phase: 2.1,
-    flickerFreqHz: 0.91,
-    flickerPhase: 1.7,
-    wanderAmp: 0.13,
-    wanderPeriodSec: 7.9,
-    wanderPhase: 1.4,
-  },
-  {
-    baseAzimuthDeg: 9,
-    orbitRadius: 0.7,
-    orbitHeight: 1.05,
-    baseWidth: 0.2,
-    sweepAmpDeg: 20,
-    periodSec: 16.5,
-    phase: 4.7,
-    flickerFreqHz: 0.55,
-    flickerPhase: 3.1,
-    wanderAmp: 0.08,
-    wanderPeriodSec: 5.5,
-    wanderPhase: 3.3,
-  },
-  {
-    baseAzimuthDeg: 34,
-    orbitRadius: 1.3,
-    orbitHeight: 1.5,
-    baseWidth: 0.34,
-    sweepAmpDeg: 27,
-    periodSec: 12.8,
-    phase: 1.3,
-    flickerFreqHz: 1.08,
-    flickerPhase: 4.4,
-    wanderAmp: 0.14,
-    wanderPeriodSec: 8.7,
-    wanderPhase: 5.0,
-  },
-  {
-    baseAzimuthDeg: 63,
-    orbitRadius: 0.95,
-    orbitHeight: 1.25,
-    baseWidth: 0.22,
-    sweepAmpDeg: 22,
-    periodSec: 17.6,
-    phase: 5.5,
-    flickerFreqHz: 0.63,
-    flickerPhase: 0.2,
-    wanderAmp: 0.1,
-    wanderPeriodSec: 6.9,
-    wanderPhase: 2.6,
-  },
-];
-
-/** Shared by every beam mesh (only the per-instance transform differs) and
- *  every lamp-glow sprite — built once, not per beam. */
-const BEAM_PLANE_GEOMETRY = new THREE.PlaneGeometry(1, 1);
-
-/**
- * One beam: a camera-facing textured shaft plus a small lamp-glow sprite at
- * its source, plus a real SpotLight aimed exactly the same way — all three
- * driven from the same per-frame source/target so the visible shaft, its
- * hotspot, and the light actually hitting the can never drift apart. All
- * motion (sweep, wander, flicker) lives in this one useFrame — nothing here
- * crosses back out of the Canvas as React state.
- */
-function SpotBeam({ config }: { config: BeamConfig }) {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const lampRef = useRef<THREE.Sprite>(null);
-  const lightRef = useRef<THREE.SpotLight>(null);
-  const targetRef = useRef<THREE.Object3D>(null);
-
-  const beamTexture = useMemo(() => createBeamTexture(), []);
-  const lampTexture = useMemo(() => createLampGlowTexture(), []);
-  const beamMaterial = useMemo(
-    () =>
-      new THREE.MeshBasicMaterial({
-        map: beamTexture,
-        transparent: true,
-        depthWrite: false,
-        depthTest: true,
-        side: THREE.DoubleSide,
-        blending: THREE.AdditiveBlending,
-      }),
-    [beamTexture]
-  );
-  const lampMaterial = useMemo(
-    () =>
-      new THREE.SpriteMaterial({
-        map: lampTexture,
-        transparent: true,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-        opacity: 0.85,
-      }),
-    [lampTexture]
-  );
-
-  // Mutated every frame below (flicker) — routed through refs, the same
-  // sanctioned escape hatch every other useFrame in this file uses, rather
-  // than closing over the plain `beamMaterial`/`lampMaterial` variables.
-  const beamMaterialRef = useRef<THREE.MeshBasicMaterial | null>(null);
-  const lampMaterialRef = useRef<THREE.SpriteMaterial | null>(null);
-
-  useEffect(() => {
-    if (lightRef.current && targetRef.current) {
-      lightRef.current.target = targetRef.current;
-    }
-  }, []);
-
-  useEffect(() => {
-    beamMaterialRef.current = beamMaterial;
-    lampMaterialRef.current = lampMaterial;
-  }, [beamMaterial, lampMaterial]);
-
-  useEffect(
-    () => () => {
-      beamTexture.dispose();
-      lampTexture.dispose();
-      beamMaterial.dispose();
-      lampMaterial.dispose();
-    },
-    [beamTexture, lampTexture, beamMaterial, lampMaterial]
-  );
-
-  const source = useRef(new THREE.Vector3());
-  const target = useRef(new THREE.Vector3());
-  const dir = useRef(new THREE.Vector3());
-  const mid = useRef(new THREE.Vector3());
-  const toCamera = useRef(new THREE.Vector3());
-  const right = useRef(new THREE.Vector3());
-  const forward = useRef(new THREE.Vector3());
-  const basis = useRef(new THREE.Matrix4());
-
-  useFrame((state) => {
-    const t = state.clock.elapsedTime;
-    const az =
-      THREE.MathUtils.degToRad(config.baseAzimuthDeg) +
-      THREE.MathUtils.degToRad(config.sweepAmpDeg) *
-        Math.sin((2 * Math.PI * t) / config.periodSec + config.phase);
-
-    source.current.set(
-      config.orbitRadius * Math.sin(az),
-      config.orbitHeight,
-      config.orbitRadius * Math.cos(az)
-    );
-
-    const wanderAngle = (2 * Math.PI * t) / config.wanderPeriodSec + config.wanderPhase;
-    target.current.set(
-      config.wanderAmp * Math.sin(wanderAngle),
-      BEAM_TARGET_Y + config.wanderAmp * 0.35 * Math.sin(wanderAngle * 1.7 + config.wanderPhase),
-      config.wanderAmp * 0.6 * Math.cos(wanderAngle)
-    );
-
-    if (lightRef.current) lightRef.current.position.copy(source.current);
-    if (targetRef.current) targetRef.current.position.copy(target.current);
-    if (lampRef.current) lampRef.current.position.copy(source.current);
-
-    if (meshRef.current) {
-      dir.current.copy(target.current).sub(source.current);
-      const length = dir.current.length();
-      dir.current.normalize();
-      mid.current.copy(source.current).add(target.current).multiplyScalar(0.5);
-
-      // Axis-locked billboard: the plane's local +Y is pinned to the actual
-      // source->target direction (so the shaft is correctly foreshortened
-      // in 3D from any angle), while it still rotates around that axis to
-      // face the camera as closely as possible — the same construction used
-      // for laser/trail billboards in games, and what keeps this immune to
-      // the edge-on-silhouette problem a lit 3D cone has.
-      toCamera.current.copy(state.camera.position).sub(mid.current).normalize();
-      right.current.crossVectors(dir.current, toCamera.current);
-      if (right.current.lengthSq() < 1e-6) {
-        right.current.set(1, 0, 0);
-      } else {
-        right.current.normalize();
-      }
-      forward.current.crossVectors(right.current, dir.current).normalize();
-      basis.current.makeBasis(right.current, dir.current, forward.current);
-
-      meshRef.current.position.copy(mid.current);
-      meshRef.current.quaternion.setFromRotationMatrix(basis.current);
-      meshRef.current.scale.set(config.baseWidth, length, 1);
-    }
-
-    // Barely-perceptible lamp flicker, shared by the visible shaft, its
-    // hotspot, and its paired real light so they never desync.
-    const flicker =
-      1 + 0.05 * Math.sin(2 * Math.PI * t * config.flickerFreqHz + config.flickerPhase);
-    if (beamMaterialRef.current) beamMaterialRef.current.opacity = flicker;
-    if (lampMaterialRef.current) lampMaterialRef.current.opacity = 0.85 * flicker;
-    if (lightRef.current) lightRef.current.intensity = BEAM_LIGHT_INTENSITY * flicker;
-  });
-
-  return (
-    <>
-      <mesh
-        ref={meshRef}
-        geometry={BEAM_PLANE_GEOMETRY}
-        material={beamMaterial}
-        renderOrder={10}
-      />
-      <sprite ref={lampRef} material={lampMaterial} scale={[0.16, 0.16, 1]} renderOrder={11} />
-      <spotLight
-        ref={lightRef}
-        color="#ffffff"
-        angle={0.22}
-        penumbra={0.55}
-        decay={2}
-        distance={6.5}
-        intensity={BEAM_LIGHT_INTENSITY}
-      />
-      <object3D ref={targetRef} />
-    </>
-  );
-}
-
-/** A faint pool of light on the floor gradient plane the beams converge on
- *  toward, plus a very low-contrast elliptical gobo break-up so the pool
- *  doesn't read as a flat, perfectly uniform disc. */
-function createGoboPoolTexture(): THREE.CanvasTexture {
-  const size = 256;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d")!;
-  const r = size / 2;
-
-  const pool = ctx.createRadialGradient(r, r, 0, r, r, r);
-  pool.addColorStop(0, "rgba(255,255,255,0.5)");
-  pool.addColorStop(0.45, "rgba(255,255,255,0.22)");
-  pool.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = pool;
-  ctx.fillRect(0, 0, size, size);
-
-  // Very low-contrast gobo break-up: a handful of soft elliptical dips,
-  // barely darker than the pool itself.
-  ctx.globalCompositeOperation = "destination-out";
-  const spots: Array<[number, number, number, number]> = [
-    [0.32, 0.4, 0.22, 0.12],
-    [0.62, 0.32, 0.18, 0.1],
-    [0.5, 0.68, 0.26, 0.08],
-    [0.72, 0.62, 0.16, 0.09],
-  ];
-  for (const [cx, cy, rad, alpha] of spots) {
-    const spot = ctx.createRadialGradient(
-      cx * size,
-      cy * size,
-      0,
-      cx * size,
-      cy * size,
-      rad * size
-    );
-    spot.addColorStop(0, `rgba(0,0,0,${alpha})`);
-    spot.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = spot;
-    ctx.fillRect(0, 0, size, size);
-  }
-  ctx.globalCompositeOperation = "source-over";
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
-
-function FloorGoboPool() {
-  const [texture] = useState(() => createGoboPoolTexture());
-  const materialRef = useRef<THREE.MeshBasicMaterial>(null);
-
-  useFrame((state) => {
-    if (!materialRef.current) return;
-    const t = state.clock.elapsedTime;
-    // Slow, shared shimmer standing in for the combined effect of five
-    // independently flickering beams landing on the same spot — one cheap
-    // sine rather than averaging all five configs every frame.
-    materialRef.current.opacity = 0.22 + 0.03 * Math.sin(t * 0.5);
-  });
-
-  return (
-    <mesh position={[0, -1.04, 0.05]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={9}>
-      <planeGeometry args={[2.2, 2.2]} />
-      <meshBasicMaterial
-        ref={materialRef}
-        map={texture}
-        transparent
-        depthWrite={false}
-        blending={THREE.AdditiveBlending}
-        opacity={0.22}
-      />
-    </mesh>
-  );
-}
-
-/**
- * The full stage rig: five sweeping beams plus the floor pool they converge
- * on. Mounted only on the full-quality desktop tier (see `!isReduced` at the
- * call site) — the reduced mobile tier and prefers-reduced-motion (which
- * never mounts EnergyDrinkCan at all, see `useCanSupport3D`) both skip it.
- */
-function SpotlightRig() {
-  return (
-    <>
-      {BEAM_CONFIGS.map((config, i) => (
-        <SpotBeam key={i} config={config} />
-      ))}
-      <FloorGoboPool />
-    </>
-  );
-}
-
 // Hoisted to module scope so these are stable references across renders —
 // Canvas reconfigures the renderer/camera whenever it sees a new object
 // identity for these props, so recreating them inline caused a
@@ -1204,13 +643,6 @@ const CANVAS_CAMERA = { position: [0, 0, 4.9] as [number, number, number], fov: 
 // the black Hero background reads as one continuous surface behind both the
 // text and the can — no separate panel behind the 3D content.
 const CANVAS_GL = { antialias: true, alpha: true };
-// Mobile tier only: lets a single-finger vertical drag scroll the page
-// natively while our own touch handlers (see useCanTouchDrag) read the
-// horizontal component to rotate the can — set as a prop rather than an
-// imperative DOM mutation so it never trips the no-mutating-hook-results
-// lint rule, and hoisted so it's a stable reference like the other Canvas
-// config below.
-const CANVAS_STYLE_TOUCH_PAN_Y: CSSProperties = { touchAction: "pan-y" };
 const CANVAS_SHADOWS = { type: THREE.PCFShadowMap };
 const DEFAULT_DPR: [number, number] = [1, 1.75];
 // Reduced mobile tier: fixed at 1 regardless of the device's real pixel
@@ -1288,7 +720,6 @@ function EnergyDrinkCan({
         dpr={isReduced ? REDUCED_DPR : DEFAULT_DPR}
         frameloop={paused ? "never" : "always"}
         onCreated={handleCreated}
-        style={isReduced ? CANVAS_STYLE_TOUCH_PAN_Y : undefined}
       >
         {/* Plain lights instead of an HDRI Environment: no network fetch, no
             one-time PMREM generation cost. Key upper right, softer fill from
@@ -1324,10 +755,7 @@ function EnergyDrinkCan({
         <SceneDepthEffects />
 
         <TiltGroup scrollProgressRef={scrollProgressRef}>
-          <SpinningCan
-            dropletCount={isReduced ? REDUCED_DROPLET_COUNT : FULL_DROPLET_COUNT}
-            touchEnabled={isReduced}
-          />
+          <SpinningCan dropletCount={isReduced ? REDUCED_DROPLET_COUNT : FULL_DROPLET_COUNT} />
         </TiltGroup>
 
         {isReduced ? (
@@ -1341,12 +769,6 @@ function EnergyDrinkCan({
             far={1.5}
           />
         )}
-
-        {/* Stage spotlight rig: full-quality tier only. The reduced mobile
-            tier skips it for cost, and prefers-reduced-motion never reaches
-            here at all since useCanSupport3D falls back to the static
-            poster before EnergyDrinkCan ever mounts. */}
-        {!isReduced && <SpotlightRig />}
 
         {/* Drag-to-orbit is desktop-only: on the reduced mobile tier a
             single-finger drag over the can needs to scroll the page, not
