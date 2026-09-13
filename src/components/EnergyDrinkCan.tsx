@@ -622,6 +622,374 @@ function AreaFillLight() {
   );
 }
 
+// --- Theatrical spotlight rig -------------------------------------------
+// Stage-style beams sweeping down from above and converging on the can.
+// Full-quality tier only (see `!isReduced` at the call site) — this never
+// mounts on the reduced mobile tier or the static poster, and since the
+// static tier is also what `useCanSupport3D` falls back to under
+// prefers-reduced-motion, that case is covered for free.
+
+/** Unit cone (apex at +Y, radius 1 at -Y), reused by every beam mesh via
+ *  per-instance scale — cheaper than rebuilding geometry every frame as
+ *  each beam's length/width changes with its sweep. */
+const BEAM_GEOMETRY = new THREE.ConeGeometry(1, 1, 20, 1, true);
+
+// Fresnel-style edge fade (bright where the surface faces the camera,
+// nothing at the grazing-angle silhouette) plus a fade along the cone's own
+// axis (bright at the apex/source, nothing at the base) — together these
+// are what keep the cone from ever showing a hard outline or a flat
+// translucent-plastic edge, from any camera angle the OrbitControls allow.
+const BEAM_VERTEX_SHADER = /* glsl */ `
+  varying vec3 vNormalView;
+  varying vec3 vViewPos;
+  varying float vY;
+
+  void main() {
+    vY = position.y;
+    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+    vViewPos = mvPosition.xyz;
+    vNormalView = normalize(normalMatrix * normal);
+    gl_Position = projectionMatrix * mvPosition;
+  }
+`;
+
+const BEAM_FRAGMENT_SHADER = /* glsl */ `
+  uniform float uOpacity;
+  uniform float uFlicker;
+  varying vec3 vNormalView;
+  varying vec3 vViewPos;
+  varying float vY;
+
+  void main() {
+    vec3 viewDir = normalize(-vViewPos);
+    float facing = abs(dot(normalize(vNormalView), viewDir));
+    float edgeFade = pow(facing, 2.4);
+    float lengthFade = smoothstep(-0.5, 0.5, vY);
+    float alpha = uOpacity * uFlicker * edgeFade * lengthFade;
+    gl_FragColor = vec4(vec3(1.0), alpha);
+  }
+`;
+
+const BEAM_BASE_OPACITY = 0.09;
+const BEAM_LIGHT_INTENSITY = 0.34;
+const BEAM_TARGET_Y = 0.15; // roughly the can's vertical center, slightly toward the label
+
+interface BeamConfig {
+  baseAzimuthDeg: number;
+  orbitRadius: number;
+  orbitHeight: number;
+  bottomRadius: number;
+  sweepAmpDeg: number;
+  periodSec: number;
+  phase: number;
+  rollAmpDeg: number;
+  rollPeriodSec: number;
+  flickerFreqHz: number;
+  flickerPhase: number;
+  wanderAmp: number;
+  wanderPeriodSec: number;
+  wanderPhase: number;
+}
+
+// Five beams, deliberately uneven in every parameter — angle, distance,
+// height, width, and every timing constant. Even spacing or matching
+// periods is what makes a sweep rig read as a mechanical pattern instead of
+// independent lamps; periods are irregular decimals within the 10-18s
+// window specifically so no two beams ever fall back into phase.
+const BEAM_CONFIGS: BeamConfig[] = [
+  {
+    baseAzimuthDeg: -58,
+    orbitRadius: 1.15,
+    orbitHeight: 2.65,
+    bottomRadius: 0.42,
+    sweepAmpDeg: 24,
+    periodSec: 11.3,
+    phase: 0.4,
+    rollAmpDeg: 8,
+    rollPeriodSec: 7.1,
+    flickerFreqHz: 0.72,
+    flickerPhase: 0.6,
+    wanderAmp: 0.18,
+    wanderPeriodSec: 6.3,
+    wanderPhase: 0.2,
+  },
+  {
+    baseAzimuthDeg: -21,
+    orbitRadius: 1.55,
+    orbitHeight: 3.05,
+    bottomRadius: 0.5,
+    sweepAmpDeg: 29,
+    periodSec: 14.7,
+    phase: 2.1,
+    rollAmpDeg: 6,
+    rollPeriodSec: 9.4,
+    flickerFreqHz: 0.91,
+    flickerPhase: 1.7,
+    wanderAmp: 0.22,
+    wanderPeriodSec: 7.9,
+    wanderPhase: 1.4,
+  },
+  {
+    baseAzimuthDeg: 9,
+    orbitRadius: 1.0,
+    orbitHeight: 2.4,
+    bottomRadius: 0.36,
+    sweepAmpDeg: 18,
+    periodSec: 16.5,
+    phase: 4.7,
+    rollAmpDeg: 10,
+    rollPeriodSec: 10.6,
+    flickerFreqHz: 0.55,
+    flickerPhase: 3.1,
+    wanderAmp: 0.15,
+    wanderPeriodSec: 5.5,
+    wanderPhase: 3.3,
+  },
+  {
+    baseAzimuthDeg: 34,
+    orbitRadius: 1.75,
+    orbitHeight: 3.2,
+    bottomRadius: 0.55,
+    sweepAmpDeg: 25,
+    periodSec: 12.8,
+    phase: 1.3,
+    rollAmpDeg: 7,
+    rollPeriodSec: 8.2,
+    flickerFreqHz: 1.08,
+    flickerPhase: 4.4,
+    wanderAmp: 0.25,
+    wanderPeriodSec: 8.7,
+    wanderPhase: 5.0,
+  },
+  {
+    baseAzimuthDeg: 63,
+    orbitRadius: 1.3,
+    orbitHeight: 2.85,
+    bottomRadius: 0.4,
+    sweepAmpDeg: 20,
+    periodSec: 17.6,
+    phase: 5.5,
+    rollAmpDeg: 9,
+    rollPeriodSec: 11.9,
+    flickerFreqHz: 0.63,
+    flickerPhase: 0.2,
+    wanderAmp: 0.2,
+    wanderPeriodSec: 6.9,
+    wanderPhase: 2.6,
+  },
+];
+
+/**
+ * One beam: a faded, edge-soft cone mesh plus a real SpotLight aimed exactly
+ * the same way, both driven from the same per-frame source/target so the
+ * visible cone and the light actually hitting the can never drift apart.
+ * All motion (sweep, self-roll, wander, flicker) lives in this one useFrame
+ * — nothing here crosses back out of the Canvas as React state.
+ */
+function SpotBeam({ config }: { config: BeamConfig }) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const lightRef = useRef<THREE.SpotLight>(null);
+  const targetRef = useRef<THREE.Object3D>(null);
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        vertexShader: BEAM_VERTEX_SHADER,
+        fragmentShader: BEAM_FRAGMENT_SHADER,
+        uniforms: {
+          uOpacity: { value: BEAM_BASE_OPACITY },
+          uFlicker: { value: 1 },
+        },
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+      }),
+    []
+  );
+
+  // The per-frame flicker below mutates the material's uniform every frame —
+  // routed through a ref (rather than closing over `material` directly) so
+  // the mutation targets ref.current, the same sanctioned escape hatch every
+  // other useFrame in this file uses (e.g. SpinningCan's `group.current.*`),
+  // not a plain render-scope variable.
+  const materialRef = useRef<THREE.ShaderMaterial | null>(null);
+
+  useEffect(() => {
+    if (lightRef.current && targetRef.current) {
+      lightRef.current.target = targetRef.current;
+    }
+  }, []);
+
+  useEffect(() => {
+    materialRef.current = material;
+    return () => material.dispose();
+  }, [material]);
+
+  const source = useRef(new THREE.Vector3());
+  const target = useRef(new THREE.Vector3());
+  const dir = useRef(new THREE.Vector3());
+  const negDir = useRef(new THREE.Vector3());
+  const mid = useRef(new THREE.Vector3());
+  const up = useRef(new THREE.Vector3(0, 1, 0));
+
+  useFrame((state) => {
+    const t = state.clock.elapsedTime;
+    const az =
+      THREE.MathUtils.degToRad(config.baseAzimuthDeg) +
+      THREE.MathUtils.degToRad(config.sweepAmpDeg) *
+        Math.sin((2 * Math.PI * t) / config.periodSec + config.phase);
+
+    source.current.set(
+      config.orbitRadius * Math.sin(az),
+      config.orbitHeight,
+      config.orbitRadius * Math.cos(az)
+    );
+
+    const wanderAngle = (2 * Math.PI * t) / config.wanderPeriodSec + config.wanderPhase;
+    target.current.set(
+      config.wanderAmp * Math.sin(wanderAngle),
+      BEAM_TARGET_Y + config.wanderAmp * 0.35 * Math.sin(wanderAngle * 1.7 + config.wanderPhase),
+      config.wanderAmp * 0.6 * Math.cos(wanderAngle)
+    );
+
+    if (lightRef.current) lightRef.current.position.copy(source.current);
+    if (targetRef.current) targetRef.current.position.copy(target.current);
+
+    if (meshRef.current) {
+      dir.current.copy(target.current).sub(source.current);
+      const length = dir.current.length();
+      dir.current.normalize();
+      negDir.current.copy(dir.current).negate();
+      mid.current.copy(source.current).add(target.current).multiplyScalar(0.5);
+
+      meshRef.current.position.copy(mid.current);
+      meshRef.current.quaternion.setFromUnitVectors(up.current, negDir.current);
+      const roll =
+        THREE.MathUtils.degToRad(config.rollAmpDeg) *
+        Math.sin((2 * Math.PI * t) / config.rollPeriodSec + config.phase * 1.3);
+      meshRef.current.rotateY(roll);
+      meshRef.current.scale.set(config.bottomRadius, length, config.bottomRadius);
+    }
+
+    // Barely-perceptible lamp flicker, shared by the visible cone and its
+    // paired real light so they never desync.
+    const flicker =
+      1 +
+      0.05 * Math.sin(2 * Math.PI * t * config.flickerFreqHz + config.flickerPhase);
+    if (materialRef.current) materialRef.current.uniforms.uFlicker.value = flicker;
+    if (lightRef.current) lightRef.current.intensity = BEAM_LIGHT_INTENSITY * flicker;
+  });
+
+  return (
+    <>
+      <mesh ref={meshRef} geometry={BEAM_GEOMETRY} material={material} renderOrder={10} />
+      <spotLight
+        ref={lightRef}
+        color="#ffffff"
+        angle={0.32}
+        penumbra={0.75}
+        decay={2}
+        distance={6.5}
+        intensity={BEAM_LIGHT_INTENSITY}
+      />
+      <object3D ref={targetRef} />
+    </>
+  );
+}
+
+/** A faint pool of light on the floor gradient plane the beams converge on
+ *  toward, plus a very low-contrast elliptical gobo break-up so the pool
+ *  doesn't read as a flat, perfectly uniform disc. */
+function createGoboPoolTexture(): THREE.CanvasTexture {
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  const r = size / 2;
+
+  const pool = ctx.createRadialGradient(r, r, 0, r, r, r);
+  pool.addColorStop(0, "rgba(255,255,255,0.5)");
+  pool.addColorStop(0.45, "rgba(255,255,255,0.22)");
+  pool.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = pool;
+  ctx.fillRect(0, 0, size, size);
+
+  // Very low-contrast gobo break-up: a handful of soft elliptical dips,
+  // barely darker than the pool itself.
+  ctx.globalCompositeOperation = "destination-out";
+  const spots: Array<[number, number, number, number]> = [
+    [0.32, 0.4, 0.22, 0.12],
+    [0.62, 0.32, 0.18, 0.1],
+    [0.5, 0.68, 0.26, 0.08],
+    [0.72, 0.62, 0.16, 0.09],
+  ];
+  for (const [cx, cy, rad, alpha] of spots) {
+    const spot = ctx.createRadialGradient(
+      cx * size,
+      cy * size,
+      0,
+      cx * size,
+      cy * size,
+      rad * size
+    );
+    spot.addColorStop(0, `rgba(0,0,0,${alpha})`);
+    spot.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = spot;
+    ctx.fillRect(0, 0, size, size);
+  }
+  ctx.globalCompositeOperation = "source-over";
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function FloorGoboPool() {
+  const [texture] = useState(() => createGoboPoolTexture());
+  const materialRef = useRef<THREE.MeshBasicMaterial>(null);
+
+  useFrame((state) => {
+    if (!materialRef.current) return;
+    const t = state.clock.elapsedTime;
+    // Slow, shared shimmer standing in for the combined effect of five
+    // independently flickering beams landing on the same spot — one cheap
+    // sine rather than averaging all five configs every frame.
+    materialRef.current.opacity = 0.22 + 0.03 * Math.sin(t * 0.5);
+  });
+
+  return (
+    <mesh position={[0, -1.04, 0.05]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={9}>
+      <planeGeometry args={[2.2, 2.2]} />
+      <meshBasicMaterial
+        ref={materialRef}
+        map={texture}
+        transparent
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+        opacity={0.22}
+      />
+    </mesh>
+  );
+}
+
+/**
+ * The full stage rig: five sweeping beams plus the floor pool they converge
+ * on. Mounted only on the full-quality desktop tier (see `!isReduced` at the
+ * call site) — the reduced mobile tier and prefers-reduced-motion (which
+ * never mounts EnergyDrinkCan at all, see `useCanSupport3D`) both skip it.
+ */
+function SpotlightRig() {
+  return (
+    <>
+      {BEAM_CONFIGS.map((config, i) => (
+        <SpotBeam key={i} config={config} />
+      ))}
+      <FloorGoboPool />
+    </>
+  );
+}
+
 // Hoisted to module scope so these are stable references across renders —
 // Canvas reconfigures the renderer/camera whenever it sees a new object
 // identity for these props, so recreating them inline caused a
@@ -769,6 +1137,12 @@ function EnergyDrinkCan({
             far={1.5}
           />
         )}
+
+        {/* Stage spotlight rig: full-quality tier only. The reduced mobile
+            tier skips it for cost, and prefers-reduced-motion never reaches
+            here at all since useCanSupport3D falls back to the static
+            poster before EnergyDrinkCan ever mounts. */}
+        {!isReduced && <SpotlightRig />}
 
         {/* Drag-to-orbit is desktop-only: on the reduced mobile tier a
             single-finger drag over the can needs to scroll the page, not

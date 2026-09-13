@@ -97,12 +97,15 @@ function GrainTile({ id, span, tag, look }: { id: number; span: string; tag: str
         </span>
       </div>
 
-      {/* Scrim + username: hidden until hover, rising from the bottom. */}
+      {/* Scrim + username: hidden until hover on a mouse, but hover can never
+          fire on a touchscreen, so it's shown by default there instead
+          (pointer: coarse, not a screen-width guess — a touch laptop/tablet
+          at desktop width has the same problem a phone does). */}
       <div
-        className="absolute inset-x-0 bottom-0 h-2/3 translate-y-full bg-gradient-to-t from-black/85 via-black/30 to-transparent opacity-0 transition-all duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100"
+        className="absolute inset-x-0 bottom-0 h-2/3 translate-y-full bg-gradient-to-t from-black/85 via-black/30 to-transparent opacity-0 transition-all duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100 pointer-coarse:translate-y-0 pointer-coarse:opacity-100"
         aria-hidden="true"
       />
-      <span className="absolute bottom-3 left-3 translate-y-2 text-[0.65rem] font-light tracking-[0.25em] text-white/80 uppercase opacity-0 transition-all duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100">
+      <span className="absolute bottom-3 left-3 translate-y-2 text-[0.65rem] font-light tracking-[0.25em] text-white/80 uppercase opacity-0 transition-all duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100 pointer-coarse:translate-y-0 pointer-coarse:opacity-100">
         {tag}
       </span>
     </TileFrame>

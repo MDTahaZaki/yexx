@@ -43,9 +43,13 @@ export default function Nav() {
         <ul className="hidden items-center gap-10 text-xs tracking-[0.2em] uppercase md:flex">
           {nav.map((item) => (
             <li key={item.href}>
-              <a href={item.href} className="group relative inline-block py-1 opacity-80 transition-opacity hover:opacity-100">
+              <a href={item.href} className="group relative inline-block py-1 opacity-80 transition-opacity hover:opacity-100 pointer-coarse:opacity-100">
                 {item.label}
-                <span className="absolute inset-x-0 -bottom-0.5 h-px origin-left scale-x-0 bg-white transition-transform duration-300 ease-out group-hover:scale-x-100 motion-reduce:transition-none" />
+                {/* Underline reveal has no touch equivalent (hover never fires
+                    on a touchscreen) — shown by default under pointer: coarse
+                    instead, e.g. a touch-screen laptop/tablet at this
+                    breakpoint. */}
+                <span className="absolute inset-x-0 -bottom-0.5 h-px origin-left scale-x-0 bg-white transition-transform duration-300 ease-out group-hover:scale-x-100 pointer-coarse:scale-x-100 motion-reduce:transition-none" />
               </a>
             </li>
           ))}
