@@ -48,7 +48,6 @@ export default function Footer() {
           as="h2"
           text={brand.mantra}
           className={`${type.h2} mb-16 font-medium uppercase`}
-          viewport
         />
 
         <div className={`grid grid-cols-1 gap-12 border-t ${layout.hairline} pt-12 md:grid-cols-3`}>
