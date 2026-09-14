@@ -3,29 +3,23 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { resetConfirmSchema, type ResetConfirmFieldErrors } from "@/lib/auth-schema";
+import PasswordField from "./PasswordField";
 import SweepButton from "@/components/SweepButton";
 import { SpinnerIcon } from "@/components/icons";
 
 type Status = "idle" | "submitting" | "error";
 
-const inputClass =
-  "w-full border border-ink/25 bg-transparent px-4 py-3 text-sm outline-none focus:border-ink";
-
 export default function ResetConfirmForm() {
   const router = useRouter();
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [errors, setErrors] = useState<ResetConfirmFieldErrors>({});
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState("");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const values = {
-      password: String(formData.get("password") ?? ""),
-      confirmPassword: String(formData.get("confirmPassword") ?? ""),
-    };
-
-    const parsed = resetConfirmSchema.safeParse(values);
+    const parsed = resetConfirmSchema.safeParse({ password, confirmPassword });
     if (!parsed.success) {
       const fieldErrors = parsed.error.flatten().fieldErrors;
       setErrors({ password: fieldErrors.password?.[0], confirmPassword: fieldErrors.confirmPassword?.[0] });
@@ -59,33 +53,26 @@ export default function ResetConfirmForm() {
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
-      <div>
-        <label htmlFor="new-password" className="mb-2 block text-xs tracking-[0.2em] uppercase">
-          New Password
-        </label>
-        <input
-          id="new-password"
-          name="password"
-          type="password"
-          autoComplete="new-password"
-          className={inputClass}
-        />
-        {errors.password && <p className="mt-2 text-xs text-ink/70">{errors.password}</p>}
-      </div>
+      <PasswordField
+        id="new-password"
+        name="password"
+        label="New Password"
+        value={password}
+        onChange={setPassword}
+        autoComplete="new-password"
+        error={errors.password}
+        showStrength
+      />
 
-      <div>
-        <label htmlFor="new-password-confirm" className="mb-2 block text-xs tracking-[0.2em] uppercase">
-          Confirm New Password
-        </label>
-        <input
-          id="new-password-confirm"
-          name="confirmPassword"
-          type="password"
-          autoComplete="new-password"
-          className={inputClass}
-        />
-        {errors.confirmPassword && <p className="mt-2 text-xs text-ink/70">{errors.confirmPassword}</p>}
-      </div>
+      <PasswordField
+        id="new-password-confirm"
+        name="confirmPassword"
+        label="Confirm New Password"
+        value={confirmPassword}
+        onChange={setConfirmPassword}
+        autoComplete="new-password"
+        error={errors.confirmPassword}
+      />
 
       {message && <p className="text-xs tracking-[0.05em] text-ink/70">{message}</p>}
 

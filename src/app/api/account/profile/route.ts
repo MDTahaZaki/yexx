@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { profileSchema } from "@/lib/profile-schema";
 import { createClient } from "@/lib/supabase/server";
+import { readJsonBody } from "@/lib/read-json-body";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -12,7 +13,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "Not signed in." }, { status: 401 });
   }
 
-  const body = await request.json().catch(() => null);
+  const body = await readJsonBody(request);
   const parsed = profileSchema.safeParse(body);
 
   if (!parsed.success) {

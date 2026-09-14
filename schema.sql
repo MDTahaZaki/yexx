@@ -62,7 +62,12 @@ create table if not exists public.preorders (
   created_at timestamptz not null default now()
 );
 
-create index if not exists preorders_user_id_idx on public.preorders (user_id);
+-- One pre-order per user, enforced by the database — not just the UI
+-- that steers a signed-in user with an existing row toward editing it
+-- instead of submitting a new one. A unique index enforces exactly the
+-- same thing as a unique constraint and supports IF NOT EXISTS, so this
+-- file stays idempotent.
+create unique index if not exists preorders_user_id_key on public.preorders (user_id);
 
 alter table public.preorders enable row level security;
 
@@ -81,11 +86,16 @@ create policy "preorders_delete_own"
   on public.preorders for delete
   using (auth.uid() = user_id);
 
--- No update policy: cancelling a pre-order is a delete (see the RLS test
--- script and /account's cancel button), not a status change. Only a
--- service-role/admin context could change `status` later (e.g. marking
--- one "confirmed" once shipping is real) — that's future work, not part
--- of this brief.
+-- Editing size/quantity on an existing pre-order (added once "one
+-- pre-order per user" meant a second submission has to become an edit)
+-- is an update — cancelling stays a delete. The API route only ever
+-- sends size/quantity/notes in the update payload; this policy just
+-- guards row ownership, same division of responsibility as profiles.
+drop policy if exists "preorders_update_own" on public.preorders;
+create policy "preorders_update_own"
+  on public.preorders for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
 -- =====================================================================
 -- Auto-create a profile row on signup
@@ -109,3 +119,47 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row
   execute function public.handle_new_user();
+
+-- =====================================================================
+-- reviews
+-- =====================================================================
+-- No real reviews exist yet (product hasn't shipped) — this table and
+-- its RLS are launched now so the feature is ready the moment approved
+-- reviews exist, but the app never renders a fake or placeholder one in
+-- the meantime (see ReviewsSection's empty state).
+create table if not exists public.reviews (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  rating int not null check (rating >= 1 and rating <= 5),
+  title text not null check (char_length(title) between 1 and 200),
+  body text not null check (char_length(body) between 1 and 4000),
+  status text not null default 'pending' check (status in ('pending', 'approved')),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists reviews_user_id_idx on public.reviews (user_id);
+create index if not exists reviews_status_idx on public.reviews (status);
+
+alter table public.reviews enable row level security;
+
+drop policy if exists "reviews_select_own_or_approved" on public.reviews;
+create policy "reviews_select_own_or_approved"
+  on public.reviews for select
+  using (auth.uid() = user_id or status = 'approved');
+
+-- Only a user with at least one pre-order can submit a review — checked
+-- here, in the RLS policy itself, not only in application code, so it
+-- holds even against a direct API call.
+drop policy if exists "reviews_insert_with_preorder" on public.reviews;
+create policy "reviews_insert_with_preorder"
+  on public.reviews for insert
+  with check (
+    auth.uid() = user_id
+    and exists (select 1 from public.preorders where preorders.user_id = auth.uid())
+  );
+
+-- No update/delete policy: a submitted review is final from the user's
+-- side (pending review by staff). Approving one — flipping `status` to
+-- 'approved' — is a moderation action taken directly in the Supabase
+-- table editor with the service role, deliberately outside this app's
+-- own API surface for now.

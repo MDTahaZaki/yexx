@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { findVariant } from "@/lib/products";
 import { checkoutRequestSchema } from "@/lib/checkout-schema";
 import { getRazorpayInstance } from "@/lib/razorpay-client";
+import { readJsonBody } from "@/lib/read-json-body";
 
 // Hard-depends on Node's crypto/https (via the razorpay package) — would
 // break silently on the Edge runtime.
@@ -14,7 +15,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, reason: "not_configured" }, { status: 503 });
   }
 
-  const body = await request.json().catch(() => null);
+  const body = await readJsonBody(request);
   const parsed = checkoutRequestSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ ok: false, errors: parsed.error.flatten() }, { status: 400 });

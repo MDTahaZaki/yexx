@@ -2,8 +2,11 @@ import type { Metadata } from "next";
 import PageHeader from "@/components/PageHeader";
 import FadeUp from "@/components/FadeUp";
 import PreorderForm from "@/components/PreorderForm";
+import ExistingPreorder from "@/components/ExistingPreorder";
+import FaqAccordion from "@/components/FaqAccordion";
 import SweepButton from "@/components/SweepButton";
 import { layout } from "@/config/brand";
+import { preorderFaqs } from "@/lib/faq";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -43,15 +46,35 @@ export default async function PreorderPage() {
             </div>
           </div>
         </div>
+        <div className={`${layout.container} ${layout.section} max-w-3xl`}>
+          <FaqAccordion items={preorderFaqs} />
+        </div>
       </>
     );
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, phone, city")
-    .eq("id", user.id)
-    .single();
+  if (!user.email_confirmed_at) {
+    return (
+      <>
+        <PageHeader kicker="Pre-Order" title="Confirm Your Email" />
+        <div className={`${layout.container} max-w-lg px-6 pb-24 md:px-12 lg:px-20`}>
+          <p className="border-t border-ink/12 pt-10 text-sm leading-relaxed text-ink/70">
+            Check your inbox for a confirmation link before placing a pre-order — it&apos;s how we
+            make sure the email we&apos;ll use to reach you actually works.
+          </p>
+        </div>
+      </>
+    );
+  }
+
+  const [{ data: profile }, { data: existing }] = await Promise.all([
+    supabase.from("profiles").select("full_name, phone, city").eq("id", user.id).single(),
+    supabase
+      .from("preorders")
+      .select("id, size, quantity, notes")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+  ]);
 
   return (
     <>
@@ -61,13 +84,20 @@ export default async function PreorderPage() {
         description="Reserve your spot for the next batch. No payment now, and the shipping date isn't confirmed yet."
       />
       <div className={`${layout.container} max-w-lg px-6 pb-24 md:px-12 lg:px-20`}>
-        <PreorderForm
-          contact={{
-            fullName: profile?.full_name ?? "",
-            phone: profile?.phone ?? "",
-            city: profile?.city ?? "",
-          }}
-        />
+        {existing ? (
+          <ExistingPreorder preorder={existing} />
+        ) : (
+          <PreorderForm
+            contact={{
+              fullName: profile?.full_name ?? "",
+              phone: profile?.phone ?? "",
+              city: profile?.city ?? "",
+            }}
+          />
+        )}
+      </div>
+      <div className={`${layout.container} ${layout.section} max-w-3xl`}>
+        <FaqAccordion items={preorderFaqs} />
       </div>
     </>
   );

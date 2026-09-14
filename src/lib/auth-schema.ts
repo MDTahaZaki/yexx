@@ -1,12 +1,26 @@
 import { z } from "zod";
+import { isDisposableEmailDomain } from "./disposable-email-domains";
+import { firstPasswordIssue } from "./password-rules";
 
-const email = z.string().trim().toLowerCase().email("Enter a valid email address");
-// Supabase's own default minimum is 6 — 8 is this project's own floor, not
-// Supabase's, kept independent of whatever the dashboard is configured to.
-const password = z.string().min(8, "Password must be at least 8 characters");
+const email = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .email("Enter a valid email address")
+  .refine((value) => !isDisposableEmailDomain(value), {
+    message: "Please use a permanent email address — disposable addresses can't receive updates.",
+  });
+
+// One password rule set shared with the live strength meter (see
+// password-rules.ts) — checked via a single `superRefine` so the *first*
+// failing rule is reported, matching what the meter highlights.
+const password = z.string().superRefine((value, ctx) => {
+  const issue = firstPasswordIssue(value);
+  if (issue) ctx.addIssue({ code: "custom", message: issue });
+});
 
 export const loginSchema = z.object({
-  email,
+  email: z.string().trim().toLowerCase().email("Enter a valid email address"),
   password: z.string().min(1, "Enter your password"),
 });
 export type LoginInput = z.infer<typeof loginSchema>;
@@ -25,10 +39,10 @@ export const registerSchema = z
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type RegisterFieldErrors = Partial<Record<"email" | "password" | "confirmPassword", string>>;
 
-export const magicLinkSchema = z.object({ email });
+export const magicLinkSchema = z.object({ email: loginSchema.shape.email });
 export type MagicLinkInput = z.infer<typeof magicLinkSchema>;
 
-export const resetRequestSchema = z.object({ email });
+export const resetRequestSchema = z.object({ email: loginSchema.shape.email });
 export type ResetRequestInput = z.infer<typeof resetRequestSchema>;
 
 export const resetConfirmSchema = z

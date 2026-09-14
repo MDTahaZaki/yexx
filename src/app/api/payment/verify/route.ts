@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { paymentVerifyRequestSchema } from "@/lib/checkout-schema";
 import { getRazorpayConfig, getRazorpayInstance } from "@/lib/razorpay-client";
 import { sendLead } from "@/lib/send-lead";
+import { readJsonBody } from "@/lib/read-json-body";
 
 // Same runtime requirement as /api/checkout — this route's HMAC check uses
 // Node's crypto module directly.
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, reason: "not_configured" }, { status: 503 });
   }
 
-  const body = await request.json().catch(() => null);
+  const body = await readJsonBody(request);
   const parsed = paymentVerifyRequestSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ ok: false, errors: parsed.error.flatten() }, { status: 400 });

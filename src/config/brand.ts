@@ -26,6 +26,7 @@ export const nav = [
   { label: "Our Story", href: "/our-story" },
   { label: "Why YEXX", href: "/why-yexx" },
   { label: "Wholesale", href: "/wholesale" },
+  { label: "FAQ", href: "/faq" },
   { label: "Contact", href: "/contact" },
 ] as const;
 

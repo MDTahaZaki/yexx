@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resetConfirmSchema } from "@/lib/auth-schema";
 import { createClient } from "@/lib/supabase/server";
+import { readJsonBody } from "@/lib/read-json-body";
 
 // Requires an active session — the one established when the user clicked
 // the emailed reset link and /auth/callback exchanged its code. There's
@@ -8,7 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 // the request's cookies carry, and that's the recovery session, scoped to
 // the account that requested the reset in the first place.
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => null);
+  const body = await readJsonBody(request);
   const parsed = resetConfirmSchema.safeParse(body);
 
   if (!parsed.success) {

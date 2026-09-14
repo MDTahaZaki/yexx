@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { PREORDER_SIZES, preorderSchema, type PreorderFieldErrors } from "@/lib/preorder-schema";
 import QuantityStepper from "./QuantityStepper";
 import SweepButton from "./SweepButton";
+import HoneypotField from "./account/HoneypotField";
 import { SpinnerIcon } from "./icons";
 
 type Status = "idle" | "submitting" | "success" | "error";
@@ -19,6 +21,7 @@ export interface ContactOnFile {
 }
 
 export default function PreorderForm({ contact }: { contact: ContactOnFile }) {
+  const router = useRouter();
   const [size, setSize] = useState<(typeof PREORDER_SIZES)[number]>("250ml");
   const [quantity, setQuantity] = useState(1);
   const [consent, setConsent] = useState(false);
@@ -57,11 +60,17 @@ export default function PreorderForm({ contact }: { contact: ContactOnFile }) {
       const res = await fetch("/api/preorder", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(parsed.data),
+        body: JSON.stringify({ ...parsed.data, website: String(formData.get("website") ?? "") }),
       });
       const body = await res.json().catch(() => null);
 
       if (!res.ok) {
+        if (body?.code === "already_exists") {
+          // Two tabs/requests raced each other — the page will re-render
+          // as ExistingPreorder once it re-fetches.
+          router.refresh();
+          return;
+        }
         setMessage(body?.message ?? "Something went wrong. Please try again.");
         setStatus("error");
         return;
@@ -92,6 +101,8 @@ export default function PreorderForm({ contact }: { contact: ContactOnFile }) {
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-6 border-t border-ink/15 pt-10">
+      <HoneypotField />
+
       <div className="flex flex-col gap-1 text-sm text-ink/70">
         <p className="text-xs tracking-[0.2em] text-ink/50 uppercase">We&apos;ll reach you at</p>
         <p>

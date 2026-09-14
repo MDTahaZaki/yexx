@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { wholesaleSchema } from "@/lib/wholesale-schema";
 import { sendLead } from "@/lib/send-lead";
+import { readJsonBody } from "@/lib/read-json-body";
 
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => null);
+  const body = await readJsonBody(request);
   const parsed = wholesaleSchema.safeParse(body);
 
   if (!parsed.success) {

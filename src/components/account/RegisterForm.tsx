@@ -4,16 +4,20 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { registerSchema, type RegisterFieldErrors } from "@/lib/auth-schema";
+import PasswordField from "./PasswordField";
+import HoneypotField from "./HoneypotField";
 import SweepButton from "@/components/SweepButton";
 import { SpinnerIcon } from "@/components/icons";
 
-type Status = "idle" | "submitting" | "error" | "confirm-email";
+type Status = "idle" | "submitting" | "error" | "confirm-email" | "email-exists";
 
 const inputClass =
   "w-full border border-ink/25 bg-transparent px-4 py-3 text-sm outline-none focus:border-ink";
 
 export default function RegisterForm({ redirectTo }: { redirectTo: string }) {
   const router = useRouter();
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [errors, setErrors] = useState<RegisterFieldErrors>({});
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState("");
@@ -23,8 +27,8 @@ export default function RegisterForm({ redirectTo }: { redirectTo: string }) {
     const formData = new FormData(event.currentTarget);
     const values = {
       email: String(formData.get("email") ?? ""),
-      password: String(formData.get("password") ?? ""),
-      confirmPassword: String(formData.get("confirmPassword") ?? ""),
+      password,
+      confirmPassword,
     };
 
     const parsed = registerSchema.safeParse(values);
@@ -45,11 +49,23 @@ export default function RegisterForm({ redirectTo }: { redirectTo: string }) {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(parsed.data),
+        body: JSON.stringify({ ...parsed.data, website: String(formData.get("website") ?? "") }),
       });
+
+      if (res.status === 429) {
+        const body = await res.json().catch(() => null);
+        setMessage(body?.message ?? "Too many attempts. Please try again later.");
+        setStatus("error");
+        return;
+      }
+
       const body = await res.json().catch(() => null);
 
       if (!res.ok) {
+        if (body?.code === "email_exists") {
+          setStatus("email-exists");
+          return;
+        }
         setMessage(body?.message ?? "Something went wrong. Please try again.");
         setStatus("error");
         return;
@@ -76,8 +92,25 @@ export default function RegisterForm({ redirectTo }: { redirectTo: string }) {
     );
   }
 
+  if (status === "email-exists") {
+    return (
+      <p className="text-sm tracking-[0.05em] text-ink/70">
+        An account with this email already exists.{" "}
+        <Link
+          href={`/account/login?redirect=${encodeURIComponent(redirectTo)}`}
+          className="underline underline-offset-4 hover:text-ink"
+        >
+          Sign in instead
+        </Link>
+        .
+      </p>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
+      <HoneypotField />
+
       <div>
         <label htmlFor="register-email" className="mb-2 block text-xs tracking-[0.2em] uppercase">
           Email
@@ -92,33 +125,26 @@ export default function RegisterForm({ redirectTo }: { redirectTo: string }) {
         {errors.email && <p className="mt-2 text-xs text-ink/70">{errors.email}</p>}
       </div>
 
-      <div>
-        <label htmlFor="register-password" className="mb-2 block text-xs tracking-[0.2em] uppercase">
-          Password
-        </label>
-        <input
-          id="register-password"
-          name="password"
-          type="password"
-          autoComplete="new-password"
-          className={inputClass}
-        />
-        {errors.password && <p className="mt-2 text-xs text-ink/70">{errors.password}</p>}
-      </div>
+      <PasswordField
+        id="register-password"
+        name="password"
+        label="Password"
+        value={password}
+        onChange={setPassword}
+        autoComplete="new-password"
+        error={errors.password}
+        showStrength
+      />
 
-      <div>
-        <label htmlFor="register-confirm" className="mb-2 block text-xs tracking-[0.2em] uppercase">
-          Confirm Password
-        </label>
-        <input
-          id="register-confirm"
-          name="confirmPassword"
-          type="password"
-          autoComplete="new-password"
-          className={inputClass}
-        />
-        {errors.confirmPassword && <p className="mt-2 text-xs text-ink/70">{errors.confirmPassword}</p>}
-      </div>
+      <PasswordField
+        id="register-confirm"
+        name="confirmPassword"
+        label="Confirm Password"
+        value={confirmPassword}
+        onChange={setConfirmPassword}
+        autoComplete="new-password"
+        error={errors.confirmPassword}
+      />
 
       {message && <p className="text-xs tracking-[0.05em] text-ink/70">{message}</p>}
 

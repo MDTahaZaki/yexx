@@ -7,3 +7,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+# Environment files
+
+Never write to, overwrite, or delete `.env.local` under any circumstances — not even to restore it, not even if it looks empty or stale. Only read it, if you need to check what keys already exist.
+
+If a task needs placeholder/test env values (e.g. to boot the app or run a build without real credentials), create `.env.test.local` instead, use that, and delete only that file afterwards. Never touch `.env.local` itself.
