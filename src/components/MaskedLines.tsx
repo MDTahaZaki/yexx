@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useReducedMotion, type Transition } from "framer-motion";
+import { motion, useReducedMotion, type Transition } from "motion/react";
 
 /**
  * Splits text into words, each clipped inside its own overflow-hidden box

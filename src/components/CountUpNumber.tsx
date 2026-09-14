@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { animate, motion, useInView, useMotionValue, useReducedMotion, useTransform } from "framer-motion";
+import { animate, motion, useInView, useMotionValue, useReducedMotion, useTransform } from "motion/react";
 
 /** Counts up from 0 to `value` once the element scrolls into view. */
 export default function CountUpNumber({

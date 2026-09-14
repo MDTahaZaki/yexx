@@ -1,7 +1,7 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
-import type { ElementType, ReactNode } from "react";
+import { motion, useReducedMotion } from "motion/react";
+import { useMemo, type ElementType, type ReactNode } from "react";
 
 /**
  * Body copy fading up under a heading with a short delay — used after a
@@ -23,7 +23,10 @@ export default function FadeUp({
   viewport?: boolean;
 }) {
   const shouldReduceMotion = useReducedMotion();
-  const MotionAs = motion(As) as typeof motion.p;
+  // motion.create (not the deprecated motion() call) — memoized on `As` so a
+  // stable component type survives re-renders instead of a fresh one every
+  // time, which would otherwise force React to remount instead of reconcile.
+  const MotionAs = useMemo(() => motion.create(As) as typeof motion.p, [As]);
 
   const animateProps = viewport
     ? { whileInView: { opacity: 1, y: 0 }, viewport: { once: true, amount: 0.6 } }

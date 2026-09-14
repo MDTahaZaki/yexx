@@ -1,8 +1,8 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { brand, layout, type } from "@/config/brand";
-import { grainBackground } from "@/lib/grain";
+import { embossTexture } from "@/lib/grain";
 import { gridImages } from "@/lib/product-images";
 import MaskedLines from "./MaskedLines";
 import Parallax from "./Parallax";
@@ -61,6 +61,7 @@ function PhotoTile({
           the crop. Scaling this wrapper on hover (not RevealImage's own
           inner drift layer) keeps the two transforms on separate nodes so
           they compose instead of one clobbering the other's inline style. */}
+      <div className="absolute inset-0 bg-bone-deep" aria-hidden="true" />
       <RevealImage
         imageProps={{
           src: photo.src,
@@ -73,8 +74,8 @@ function PhotoTile({
         wrapperClassName="inset-0 transition-transform duration-500 ease-out group-hover:scale-105"
       />
       <div
-        className="pointer-events-none absolute inset-0 opacity-25 mix-blend-overlay"
-        style={{ backgroundImage: grainBackground }}
+        className="pointer-events-none absolute inset-0 opacity-[0.07] mix-blend-multiply"
+        style={{ backgroundImage: embossTexture }}
         aria-hidden="true"
       />
 
@@ -83,10 +84,10 @@ function PhotoTile({
           (pointer: coarse, not a screen-width guess — a touch laptop/tablet
           at desktop width has the same problem a phone does). */}
       <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 translate-y-full bg-gradient-to-t from-black/85 via-black/30 to-transparent opacity-0 transition-all duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100 pointer-coarse:translate-y-0 pointer-coarse:opacity-100"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 translate-y-full bg-gradient-to-t from-ink/85 via-ink/30 to-transparent opacity-0 transition-all duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100 pointer-coarse:translate-y-0 pointer-coarse:opacity-100"
         aria-hidden="true"
       />
-      <span className="pointer-events-none absolute bottom-3 left-3 translate-y-2 text-[0.65rem] font-light tracking-[0.25em] text-white/80 uppercase opacity-0 transition-all duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100 pointer-coarse:translate-y-0 pointer-coarse:opacity-100">
+      <span className="pointer-events-none absolute bottom-3 left-3 translate-y-2 text-[0.65rem] font-light tracking-[0.25em] text-bone/90 uppercase opacity-0 transition-all duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100 pointer-coarse:translate-y-0 pointer-coarse:opacity-100">
         {tag}
       </span>
     </TileFrame>
@@ -96,11 +97,11 @@ function PhotoTile({
 function TagUsTile({ id, span }: { id: number; span: string }) {
   return (
     <TileFrame id={id} span={span}>
-      <div className="flex h-full w-full flex-col items-center justify-center gap-3 border border-white/10 bg-black">
-        <span className="text-lg font-bold tracking-[0.15em] text-white uppercase">
+      <div className="flex h-full w-full flex-col items-center justify-center gap-3 border border-gold/30 bg-bone-deep">
+        <span className="text-lg font-medium tracking-[0.15em] text-ink uppercase">
           {brand.hashtag}
         </span>
-        <span className="text-[0.65rem] tracking-[0.35em] text-white/45 uppercase">Tag us</span>
+        <span className="text-[0.65rem] tracking-[0.35em] text-ink/45 uppercase">Tag us</span>
       </div>
     </TileFrame>
   );
@@ -108,16 +109,16 @@ function TagUsTile({ id, span }: { id: number; span: string }) {
 
 export default function SocialGrid() {
   return (
-    <section className={`${layout.section} bg-black text-white`}>
+    <section className={`${layout.section} bg-bone text-ink`}>
       <div className={layout.container}>
         <div className="mb-14 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <MaskedLines
             as="h2"
             text={brand.hashtag}
-            className={`${type.h2} font-bold uppercase`}
+            className={`${type.h2} font-medium uppercase`}
             viewport
           />
-          <p className={`${type.eyebrow} text-white/50`}>Tag us to be featured</p>
+          <p className={`${type.eyebrow} text-ink/50`}>Tag us to be featured</p>
         </div>
 
         <Parallax rangePx={22}>

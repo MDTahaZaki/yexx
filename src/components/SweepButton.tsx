@@ -1,11 +1,14 @@
+"use client";
+
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, PointerEvent, ReactNode } from "react";
-import { motion, useMotionValue, useReducedMotion, useSpring } from "framer-motion";
+import { motion, useMotionValue, useReducedMotion, useSpring } from "motion/react";
 
 interface SweepButtonBaseProps {
-  /** "dark" = black button (sweeps white, text inverts black->white) — for
-   *  light sections. "light" = white button (sweeps black, text inverts
-   *  white->black) — for dark sections. Named after the button's own base
-   *  color, not the section it sits on. */
+  /** "dark" = ink button that sweeps gold on hover (text inverts bone->ink)
+   *  — the primary CTA. "light" = bone button, bordered, that sweeps ink on
+   *  hover (text inverts ink->bone) — secondary actions on the same light
+   *  sections, since the whole site is one light theme now. Named after the
+   *  button's own base color, not the section it sits on. */
   variant: "dark" | "light";
   /** "compact" trims the padding for tight inline placements (e.g. next to
    *  a newsletter input) without losing the sweep/invert effect. */
@@ -14,7 +17,7 @@ interface SweepButtonBaseProps {
   className?: string;
 }
 
-// framer-motion's motion.a/motion.button redeclare onDrag*/onAnimation* with
+// Motion's motion.a/motion.button redeclare onDrag*/onAnimation* with
 // gesture-specific signatures that conflict with the native DOM event
 // handler types of the same name — excluded here since nothing in this
 // component uses the native versions anyway.
@@ -79,9 +82,9 @@ export default function SweepButton({
     y.set(0);
   }
 
-  const base = variant === "dark" ? "bg-black text-white" : "bg-white text-black";
-  const sweep = variant === "dark" ? "bg-white" : "bg-black";
-  const invertText = variant === "dark" ? "text-black" : "text-white";
+  const base = variant === "dark" ? "bg-ink text-bone" : "bg-bone border border-ink/30 text-ink";
+  const sweep = variant === "dark" ? "bg-gold" : "bg-ink";
+  const invertText = variant === "dark" ? "text-ink" : "text-bone";
   const padding = size === "compact" ? "px-4 py-2" : "px-8 py-4";
   const sharedClassName = `group relative overflow-hidden ${base} ${padding} text-xs font-semibold tracking-[0.25em] uppercase ${className}`;
 

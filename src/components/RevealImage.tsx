@@ -1,7 +1,7 @@
 "use client";
 
 import Image, { type ImageProps } from "next/image";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "motion/react";
 
 /**
  * Wraps a next/image in a clip-path wipe (bottom -> top, not a fade — wipes
@@ -41,14 +41,14 @@ export default function RevealImage({
         whileInView={shouldReduceMotion ? undefined : { clipPath: "inset(0% 0% 0% 0%)" }}
         viewport={{ once: true, amount: 0.3 }}
         transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
-        className="h-full w-full"
+        className="relative h-full w-full"
       >
         <motion.div
           initial={false}
           whileInView={shouldReduceMotion ? undefined : { scale: 1.06 }}
           viewport={{ once: true, amount: 0.3 }}
           transition={{ duration: scaleDurationSec, ease: "easeOut" }}
-          className="h-full w-full"
+          className="relative h-full w-full"
         >
           {/* alt is spread in via imageProps — next/image's ImageProps type
               already makes it mandatory at every call site, so this is a

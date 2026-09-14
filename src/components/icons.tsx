@@ -1,7 +1,7 @@
 // Minimal geometric line icons for the pillar badges. No emoji, no fills — just
 // monochrome strokes so they inherit whatever text colour surrounds them.
 
-export function CleanEnergyIcon({ className = "" }: { className?: string }) {
+export function NaturalEnergyIcon({ className = "" }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
       <path
@@ -20,6 +20,20 @@ export function FocusIcon({ className = "" }: { className?: string }) {
       <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.5" />
       <circle cx="12" cy="12" r="1.6" fill="currentColor" />
       <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+export function EnduranceIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M2 13h4l2-6 3 12 3-9 2 3h6"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

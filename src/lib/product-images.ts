@@ -10,9 +10,12 @@
 // 250ml render — the two sizes actually sold — so it's the placeholder
 // format everywhere below, until the client picks the real one. Swapping
 // formats later means changing the two SLIM_* paths/dimensions here, not
-// touching Shop, Pillars, or SocialGrid.
-const SLIM_150 = { src: "/product/01_slim_150.webp", width: 362, height: 509 };
-const SLIM_250 = { src: "/product/02_slim_250.webp", width: 362, height: 698 };
+// touching Pillars or SocialGrid.
+//
+// The "-gold" suffix marks the recolored (warm bone + brushed gold) render —
+// see the sibling non-suffixed .webp for the original dark-theme source.
+const SLIM_150 = { src: "/product/01_slim_150-gold.png", width: 362, height: 509 };
+const SLIM_250 = { src: "/product/02_slim_250-gold.png", width: 362, height: 698 };
 
 interface ProductImage {
   src: string;
@@ -28,13 +31,6 @@ interface CroppedProductImage extends ProductImage {
    *  the framing — never swap in a different shape to do it. */
   objectPosition: string;
 }
-
-// The two can sizes actually sold (see config/brand.ts `sizes`) — same
-// shape, different height, per size. Never two different can designs.
-export const shopImages: Record<"150ml" | "250ml", ProductImage> = {
-  "150ml": SLIM_150,
-  "250ml": SLIM_250,
-};
 
 // One photo tile in the #YEXXYOURWAY grid per entry. Both the 150ml and
 // 250ml slim renders are used across these — same format throughout, the
@@ -57,4 +53,5 @@ export const pillarImages: CroppedProductImage[] = [
   { ...SLIM_150, objectPosition: "50% 92%" }, // wordmark/base — condensation stand-in
   { ...SLIM_250, objectPosition: "50% 40%" }, // Y mark
   { ...SLIM_150, objectPosition: "50% 6%" }, // lid/rim
+  { ...SLIM_250, objectPosition: "50% 25%" }, // shoulder
 ];

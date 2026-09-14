@@ -18,7 +18,7 @@ interface CheckoutFormProps {
 }
 
 const inputClass =
-  "w-full border border-black/25 bg-transparent px-4 py-3 text-sm outline-none focus:border-black";
+  "w-full border border-ink/25 bg-transparent px-4 py-3 text-sm outline-none focus:border-ink";
 
 export default function CheckoutForm({ onSuccess, onPaymentInProgressChange }: CheckoutFormProps) {
   const { items, lines, subtotal, clearCart } = useCart();
@@ -45,7 +45,7 @@ export default function CheckoutForm({ onSuccess, onPaymentInProgressChange }: C
           razorpay_signature: response.razorpay_signature,
           delivery,
           items: lines.map((line) => ({
-            sizeId: line.sizeId,
+            variantId: line.variantId,
             quantity: line.quantity,
             label: line.label,
           })),
@@ -152,7 +152,7 @@ export default function CheckoutForm({ onSuccess, onPaymentInProgressChange }: C
         email: parsed.data.email,
         contact: `+91${parsed.data.phone}`,
       },
-      theme: { color: "#000000" },
+      theme: { color: "#9c7c3e" },
       modal: {
         ondismiss: () => {
           if (paymentSucceededRef.current) return;
@@ -175,7 +175,7 @@ export default function CheckoutForm({ onSuccess, onPaymentInProgressChange }: C
           Full Name
         </label>
         <input id="fullName" name="fullName" type="text" className={inputClass} />
-        {errors.fullName && <p className="mt-2 text-xs text-black/70">{errors.fullName}</p>}
+        {errors.fullName && <p className="mt-2 text-xs text-ink/70">{errors.fullName}</p>}
       </div>
 
       <div>
@@ -183,7 +183,7 @@ export default function CheckoutForm({ onSuccess, onPaymentInProgressChange }: C
           Phone
         </label>
         <input id="checkout-phone" name="phone" type="tel" inputMode="numeric" className={inputClass} />
-        {errors.phone && <p className="mt-2 text-xs text-black/70">{errors.phone}</p>}
+        {errors.phone && <p className="mt-2 text-xs text-ink/70">{errors.phone}</p>}
       </div>
 
       <div>
@@ -191,7 +191,7 @@ export default function CheckoutForm({ onSuccess, onPaymentInProgressChange }: C
           Email
         </label>
         <input id="checkout-email" name="email" type="email" className={inputClass} />
-        {errors.email && <p className="mt-2 text-xs text-black/70">{errors.email}</p>}
+        {errors.email && <p className="mt-2 text-xs text-ink/70">{errors.email}</p>}
       </div>
 
       <div>
@@ -199,12 +199,12 @@ export default function CheckoutForm({ onSuccess, onPaymentInProgressChange }: C
           Address Line 1
         </label>
         <input id="addressLine1" name="addressLine1" type="text" className={inputClass} />
-        {errors.addressLine1 && <p className="mt-2 text-xs text-black/70">{errors.addressLine1}</p>}
+        {errors.addressLine1 && <p className="mt-2 text-xs text-ink/70">{errors.addressLine1}</p>}
       </div>
 
       <div>
         <label htmlFor="addressLine2" className="mb-2 block text-xs tracking-[0.2em] uppercase">
-          Address Line 2 <span className="text-black/40 normal-case">(optional)</span>
+          Address Line 2 <span className="text-ink/40 normal-case">(optional)</span>
         </label>
         <input id="addressLine2" name="addressLine2" type="text" className={inputClass} />
       </div>
@@ -215,14 +215,14 @@ export default function CheckoutForm({ onSuccess, onPaymentInProgressChange }: C
             City
           </label>
           <input id="city" name="city" type="text" className={inputClass} />
-          {errors.city && <p className="mt-2 text-xs text-black/70">{errors.city}</p>}
+          {errors.city && <p className="mt-2 text-xs text-ink/70">{errors.city}</p>}
         </div>
         <div>
           <label htmlFor="pincode" className="mb-2 block text-xs tracking-[0.2em] uppercase">
             Pincode
           </label>
           <input id="pincode" name="pincode" type="text" inputMode="numeric" className={inputClass} />
-          {errors.pincode && <p className="mt-2 text-xs text-black/70">{errors.pincode}</p>}
+          {errors.pincode && <p className="mt-2 text-xs text-ink/70">{errors.pincode}</p>}
         </div>
       </div>
 
@@ -240,11 +240,11 @@ export default function CheckoutForm({ onSuccess, onPaymentInProgressChange }: C
             </option>
           ))}
         </select>
-        {errors.state && <p className="mt-2 text-xs text-black/70">{errors.state}</p>}
+        {errors.state && <p className="mt-2 text-xs text-ink/70">{errors.state}</p>}
       </div>
 
       {paymentError && (
-        <p className="text-xs tracking-[0.05em] text-black/70">{paymentError}</p>
+        <p className="text-xs tracking-[0.05em] text-ink/70">{paymentError}</p>
       )}
 
       <SweepButton

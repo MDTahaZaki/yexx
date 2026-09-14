@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
-import { sizes } from "@/config/brand";
+import { findVariant } from "@/lib/products";
 import { checkoutRequestSchema } from "@/lib/checkout-schema";
 import { getRazorpayInstance } from "@/lib/razorpay-client";
 
@@ -20,18 +20,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, errors: parsed.error.flatten() }, { status: 400 });
   }
 
-  // Prices are never trusted from the client — only sizeId + quantity.
-  // Reject anything referencing a size that doesn't exist.
+  // Prices are never trusted from the client — only variantId + quantity.
+  // Reject anything referencing a variant that doesn't exist.
   let amountRupees = 0;
   for (const item of parsed.data.items) {
-    const size = sizes.find((s) => s.id === item.sizeId);
-    if (!size) {
+    const found = findVariant(item.variantId);
+    if (!found) {
       return NextResponse.json(
-        { ok: false, errors: { items: [`Unknown size: ${item.sizeId}`] } },
+        { ok: false, errors: { items: [`Unknown variant: ${item.variantId}`] } },
         { status: 400 }
       );
     }
-    amountRupees += size.price * item.quantity;
+    amountRupees += found.variant.price * item.quantity;
   }
 
   if (amountRupees <= 0) {

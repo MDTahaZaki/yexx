@@ -1,23 +1,16 @@
 "use client";
 
 import { useRef } from "react";
-import dynamic from "next/dynamic";
-import { motion, useMotionValueEvent, useScroll, useSpring, useTransform } from "framer-motion";
+import { motion, useMotionValueEvent, useScroll, useSpring, useTransform } from "motion/react";
 import CanScene from "./CanScene";
 import MaskedLines from "./MaskedLines";
 import FadeUp from "./FadeUp";
 import SweepButton from "./SweepButton";
 import { useCanSupport3D } from "@/lib/use-can-support";
 import { brand, callouts, pillars, type } from "@/config/brand";
-import { CleanEnergyIcon, FocusIcon, PerformanceIcon } from "./icons";
+import { NaturalEnergyIcon, FocusIcon, EnduranceIcon, PerformanceIcon } from "./icons";
 
-// Pulls in `ogl`/WebGL — kept out of the initial bundle like the can itself,
-// and only ever mounted when `tier` says full motion content is safe to show.
-const ParticlesBackground = dynamic(() => import("./ParticlesBackground"), {
-  ssr: false,
-});
-
-const pillarIcons = [CleanEnergyIcon, FocusIcon, PerformanceIcon];
+const pillarIcons = [NaturalEnergyIcon, FocusIcon, EnduranceIcon, PerformanceIcon];
 
 export default function Hero() {
   const sectionRef = useRef<HTMLElement>(null);
@@ -45,36 +38,31 @@ export default function Hero() {
     <section
       ref={sectionRef}
       id="top"
-      className="relative min-h-screen overflow-hidden bg-black text-white"
+      className="relative min-h-screen overflow-hidden bg-bone text-ink"
     >
-      {/* Full-quality only: skipped on the reduced mobile 3D tier, the
-          static fallback, and under prefers-reduced-motion. Sits behind the
-          z-10 content below with no z-index of its own. */}
-      {tier === "full" && <ParticlesBackground />}
-
       <div className="relative z-10 mx-auto flex max-w-[1400px] flex-col gap-14 px-6 pt-[var(--nav-h)] pb-20 md:px-12 lg:flex-row lg:items-center lg:gap-8 lg:px-20">
         {/* Left column. `min-w-0` overrides the flex default of `min-width:
             auto`, which otherwise lets the headline's intrinsic width push
             this column (and the page) wider than the viewport instead of
             wrapping. */}
         <div className="flex min-w-0 flex-1 flex-col gap-9">
-          <p className={`${type.eyebrow} text-white/60`}>{brand.tagline}</p>
+          <p className={`${type.eyebrow} text-gold-deep`}>{brand.tagline}</p>
 
           <MaskedLines
             as="h1"
-            text={brand.headline}
-            className={`${type.hero} max-w-[10ch] font-bold uppercase`}
+            text={`${brand.headline} ${brand.headlineSecondLine}`}
+            className={`${type.hero} max-w-[10ch] font-medium uppercase`}
             delay={0.15}
           />
 
-          <FadeUp as="p" delay={0.5} className={`${type.body} max-w-md text-white/70`}>
+          <FadeUp as="p" delay={0.5} className={`${type.body} max-w-md text-ink/70`}>
             {brand.bio}
           </FadeUp>
 
-          <ul className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs tracking-[0.15em] text-white/60 uppercase">
+          <ul className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs tracking-[0.15em] text-ink/60 uppercase">
             {callouts.map((c, i) => (
               <li key={c} className="flex items-center gap-5">
-                {i > 0 && <span className="h-3 w-px bg-white/25" aria-hidden="true" />}
+                {i > 0 && <span className="h-3 w-px bg-ink/20" aria-hidden="true" />}
                 {c}
               </li>
             ))}
@@ -86,25 +74,22 @@ export default function Hero() {
               const Icon = pillarIcons[i];
               return (
                 <li key={p.id} className="flex items-center gap-4">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/30">
-                    <Icon className="h-4 w-4 text-white" />
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-gold/40">
+                    <Icon className="h-4 w-4 text-gold-deep" />
                   </span>
-                  <span className="text-sm tracking-wide text-white/80 uppercase">{p.title}</span>
+                  <span className="text-sm tracking-wide text-ink/80 uppercase">{p.title}</span>
                 </li>
               );
             })}
           </ul>
 
           <div className="flex flex-wrap items-center gap-8 pt-4">
-            {/* Plain anchor to #shop, letting the user choose a size
-                themselves — no longer pre-adds a hardcoded quantity to the
-                cart before a size is even selected. */}
-            <SweepButton variant="light" href="#shop">
+            <SweepButton variant="dark" href="/shop">
               Shop Now
             </SweepButton>
             <a
-              href="#formula"
-              className="text-xs tracking-[0.2em] text-white uppercase underline underline-offset-4"
+              href="/why-yexx"
+              className="text-xs tracking-[0.2em] text-ink underline underline-offset-4"
             >
               View Nutrition
             </a>
@@ -121,13 +106,19 @@ export default function Hero() {
             never overflows a short window — see EnergyDrinkCan's camera
             comment for how the can's size *within* this container is
             separately tuned. */}
-        <div className="relative h-[clamp(260px,48dvh,420px)] flex-1 lg:h-[clamp(360px,58dvh,640px)]">
-          <motion.div
-            style={tier === "static" ? { y: parallaxY } : undefined}
-            className="h-full w-full"
-          >
-            <CanScene tier={tier} scrollProgressRef={scrollProgressRef} />
-          </motion.div>
+        <div className="flex flex-1 flex-col items-center gap-3">
+          <div className="relative h-[clamp(260px,48dvh,420px)] w-full lg:h-[clamp(360px,58dvh,640px)]">
+            <motion.div
+              style={tier === "static" ? { y: parallaxY } : undefined}
+              className="h-full w-full"
+            >
+              <CanScene tier={tier} scrollProgressRef={scrollProgressRef} />
+            </motion.div>
+          </div>
+          {/* Volume badge — the one size shown in the hero. */}
+          <span className="border border-gold/50 px-3 py-1 text-[0.65rem] tracking-[0.3em] text-gold-deep uppercase">
+            {brand.volumeBadge}
+          </span>
         </div>
       </div>
     </section>

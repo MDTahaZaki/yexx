@@ -1,12 +1,12 @@
 "use client";
 
-import { motion, type Variants } from "framer-motion";
+import { motion, type Variants } from "motion/react";
 import { pillars, type, layout } from "@/config/brand";
 import { pillarImages } from "@/lib/product-images";
-import { CleanEnergyIcon, FocusIcon, PerformanceIcon } from "./icons";
+import { NaturalEnergyIcon, FocusIcon, EnduranceIcon, PerformanceIcon } from "./icons";
 import RevealImage from "./RevealImage";
 
-const pillarIcons = [CleanEnergyIcon, FocusIcon, PerformanceIcon];
+const pillarIcons = [NaturalEnergyIcon, FocusIcon, EnduranceIcon, PerformanceIcon];
 
 const container: Variants = {
   hidden: {},
@@ -20,14 +20,14 @@ const item: Variants = {
 
 export default function Pillars() {
   return (
-    <section id="benefits" className={`${layout.section} bg-white text-black`}>
+    <section id="benefits" className={`${layout.section} bg-bone text-ink`}>
       <div className={layout.container}>
         <motion.div
           variants={container}
           initial="hidden"
           whileInView="show"
           viewport={{ once: true, amount: 0.3 }}
-          className="grid grid-cols-1 border-t border-black/15 md:grid-cols-3 md:divide-x md:divide-black/15"
+          className={`grid grid-cols-1 border-t ${layout.hairlineGold} sm:grid-cols-2 sm:divide-x ${layout.hairline} lg:grid-cols-4`}
         >
           {pillars.map((p, i) => {
             const Icon = pillarIcons[i];
@@ -36,7 +36,7 @@ export default function Pillars() {
               <motion.div
                 key={p.id}
                 variants={item}
-                className="flex flex-col gap-6 border-b border-black/15 px-0 py-12 md:border-b-0 md:px-10 md:first:pl-0 lg:px-14"
+                className={`flex flex-col gap-6 border-b ${layout.hairline} px-0 py-12 sm:px-8 sm:first:pl-0 lg:px-8`}
               >
                 <RevealImage
                   imageProps={{
@@ -44,16 +44,16 @@ export default function Pillars() {
                     alt: "",
                     width: photo.width,
                     height: photo.height,
-                    sizes: "(min-width: 768px) 33vw, 90vw",
+                    sizes: "(min-width: 1024px) 25vw, 45vw",
                     style: { objectPosition: photo.objectPosition },
                   }}
-                  wrapperClassName="h-40 w-full grayscale"
+                  wrapperClassName="h-40 w-full"
                 />
-                <span className="flex h-12 w-12 items-center justify-center rounded-full border border-black/25">
-                  <Icon className="h-5 w-5" />
+                <span className="flex h-12 w-12 items-center justify-center rounded-full border border-gold/40">
+                  <Icon className="h-5 w-5 text-gold-deep" />
                 </span>
-                <h3 className={`${type.h3} font-bold uppercase`}>{p.title}</h3>
-                <p className="text-sm leading-relaxed text-black/65">{p.description}</p>
+                <h3 className={`${type.h3} font-medium uppercase`}>{p.title}</h3>
+                <p className="text-sm leading-relaxed text-ink/65">{p.description}</p>
               </motion.div>
             );
           })}

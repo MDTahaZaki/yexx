@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, type ReactNode } from "react";
-import { motion, useScroll, useTransform, useReducedMotion } from "framer-motion";
+import { motion, useScroll, useTransform, useReducedMotion } from "motion/react";
 
 /**
  * Wraps content in a small vertical drift tied to its own scroll progress

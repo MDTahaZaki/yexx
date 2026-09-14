@@ -1,8 +1,18 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #0a0a0a;
+  /* Warm luxury palette — bone/off-white ground, warm near-black ink, gold
+     accent used sparingly (rules, marks, small highlights). Replaces the
+     old stark black/white direction site-wide; there is no dark-mode
+     variant of this brand, so no prefers-color-scheme override. */
+  --color-bone: #f5f0e6;
+  --color-bone-deep: #ece3d1;
+  --color-ink: #241f17;
+  --color-gold: #c6a664;
+  --color-gold-deep: #9c7c3e;
+
+  --background: var(--color-bone);
+  --foreground: var(--color-ink);
   /* Single source of truth for the fixed Nav's rendered height, so Hero's
      top padding can match it exactly instead of guessing a value that
      drifts out of sync when Nav's own spacing changes. */
@@ -18,6 +28,11 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-bone: var(--color-bone);
+  --color-bone-deep: var(--color-bone-deep);
+  --color-ink: var(--color-ink);
+  --color-gold: var(--color-gold);
+  --color-gold-deep: var(--color-gold-deep);
   --font-sans: var(--font-space-grotesk);
   --font-mono: var(--font-jetbrains-mono);
   --animate-marquee: marquee 32s linear infinite;

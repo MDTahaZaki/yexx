@@ -83,40 +83,40 @@ export default function WholesaleForm() {
   }
 
   const inputClass =
-    "w-full border border-black/25 bg-transparent px-4 py-3 text-sm outline-none focus:border-black";
+    "w-full border border-ink/25 bg-transparent px-4 py-3 text-sm outline-none focus:border-ink";
 
   return (
-    <section id="wholesale" className={`${layout.section} bg-white text-black`}>
+    <section id="wholesale" className={`${layout.section} bg-bone text-ink`}>
       <div className={`${layout.container} grid grid-cols-1 gap-16 lg:grid-cols-2`}>
         <div className="flex flex-col justify-center gap-6">
-          <MaskedLines as="h2" text="Wholesale" className={`${type.h2} font-bold uppercase`} viewport />
-          <FadeUp viewport className="max-w-sm text-sm leading-relaxed text-black/65">
+          <MaskedLines as="h2" text="Wholesale" className={`${type.h2} font-medium uppercase`} viewport />
+          <FadeUp viewport className="max-w-sm text-sm leading-relaxed text-ink/65">
             Stock YEXX in your store, gym, or venue. Tell us about your business and we&apos;ll
             follow up with pricing and case sizes.
           </FadeUp>
         </div>
 
         {status === "success" ? (
-          <div className="flex flex-col items-start gap-4 border-t border-black/15 pt-10">
+          <div className="flex flex-col items-start gap-4 border-t border-ink/15 pt-10">
             <p className="text-sm tracking-[0.1em] uppercase">
               Request received — we&apos;ll be in touch.
             </p>
             <button
               type="button"
               onClick={() => setStatus("idle")}
-              className="text-xs tracking-[0.15em] text-black/60 underline underline-offset-4 uppercase hover:text-black"
+              className="text-xs tracking-[0.15em] text-ink/60 underline underline-offset-4 uppercase hover:text-ink"
             >
               Send another request
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5 border-t border-black/15 pt-10">
+          <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5 border-t border-ink/15 pt-10">
             <div>
               <label htmlFor="name" className="mb-2 block text-xs tracking-[0.2em] uppercase">
                 Name
               </label>
               <input id="name" name="name" type="text" className={inputClass} />
-              {errors.name && <p className="mt-2 text-xs text-black/70">{errors.name}</p>}
+              {errors.name && <p className="mt-2 text-xs text-ink/70">{errors.name}</p>}
             </div>
 
             <div>
@@ -124,7 +124,7 @@ export default function WholesaleForm() {
                 Email
               </label>
               <input id="email" name="email" type="email" className={inputClass} />
-              {errors.email && <p className="mt-2 text-xs text-black/70">{errors.email}</p>}
+              {errors.email && <p className="mt-2 text-xs text-ink/70">{errors.email}</p>}
             </div>
 
             <div>
@@ -132,7 +132,7 @@ export default function WholesaleForm() {
                 Phone
               </label>
               <input id="phone" name="phone" type="tel" inputMode="numeric" className={inputClass} />
-              {errors.phone && <p className="mt-2 text-xs text-black/70">{errors.phone}</p>}
+              {errors.phone && <p className="mt-2 text-xs text-ink/70">{errors.phone}</p>}
             </div>
 
             <div>
@@ -141,7 +141,7 @@ export default function WholesaleForm() {
               </label>
               <input id="businessName" name="businessName" type="text" className={inputClass} />
               {errors.businessName && (
-                <p className="mt-2 text-xs text-black/70">{errors.businessName}</p>
+                <p className="mt-2 text-xs text-ink/70">{errors.businessName}</p>
               )}
             </div>
 
@@ -160,7 +160,7 @@ export default function WholesaleForm() {
                 ))}
               </select>
               {errors.monthlyVolume && (
-                <p className="mt-2 text-xs text-black/70">{errors.monthlyVolume}</p>
+                <p className="mt-2 text-xs text-ink/70">{errors.monthlyVolume}</p>
               )}
             </div>
 
@@ -169,11 +169,11 @@ export default function WholesaleForm() {
                 Notes
               </label>
               <textarea id="notes" name="notes" rows={4} className={inputClass} />
-              {errors.notes && <p className="mt-2 text-xs text-black/70">{errors.notes}</p>}
+              {errors.notes && <p className="mt-2 text-xs text-ink/70">{errors.notes}</p>}
             </div>
 
             {status === "error" && (
-              <p className="text-xs tracking-[0.1em] text-black/70 uppercase">{errorMessage}</p>
+              <p className="text-xs tracking-[0.1em] text-ink/70 uppercase">{errorMessage}</p>
             )}
 
             <SweepButton

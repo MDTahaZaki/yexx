@@ -1,10 +1,10 @@
 "use client";
 
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
-import { sizes, type SizeId } from "@/config/brand";
+import { findVariant } from "./products";
 
 export interface CartLineItem {
-  sizeId: SizeId;
+  variantId: string;
   quantity: number;
 }
 
@@ -20,9 +20,9 @@ interface CartContextValue {
   isOpen: boolean;
   openCart: () => void;
   closeCart: () => void;
-  addItem: (sizeId: SizeId, quantity: number) => void;
-  updateQuantity: (sizeId: SizeId, quantity: number) => void;
-  removeItem: (sizeId: SizeId) => void;
+  addItem: (variantId: string, quantity: number) => void;
+  updateQuantity: (variantId: string, quantity: number) => void;
+  removeItem: (variantId: string) => void;
   clearCart: () => void;
   subtotal: number;
   totalCount: number;
@@ -35,18 +35,23 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
 
   const value = useMemo<CartContextValue>(() => {
-    // Unit price is derived from the live `sizes` config here, not
+    // Unit price is derived from the live product catalog here, not
     // snapshotted onto the line item — there's no order history or
     // price-change scenario in this session-only cart to justify
     // snapshotting, so deriving it keeps one source of truth for price.
-    const lines: CartLine[] = items.map((item) => {
-      const size = sizes.find((s) => s.id === item.sizeId)!;
-      return {
-        ...item,
-        label: size.label,
-        unitPrice: size.price,
-        lineTotal: size.price * item.quantity,
-      };
+    // A variant that's since disappeared from the catalog is silently
+    // dropped from the rendered lines rather than crashing the cart.
+    const lines: CartLine[] = items.flatMap((item) => {
+      const found = findVariant(item.variantId);
+      if (!found) return [];
+      return [
+        {
+          ...item,
+          label: found.variant.title,
+          unitPrice: found.variant.price,
+          lineTotal: found.variant.price * item.quantity,
+        },
+      ];
     });
 
     return {
@@ -55,22 +60,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
       isOpen,
       openCart: () => setIsOpen(true),
       closeCart: () => setIsOpen(false),
-      addItem: (sizeId, quantity) => {
+      addItem: (variantId, quantity) => {
         setItems((prev) => {
-          const existing = prev.find((i) => i.sizeId === sizeId);
+          const existing = prev.find((i) => i.variantId === variantId);
           if (existing) {
             return prev.map((i) =>
-              i.sizeId === sizeId ? { ...i, quantity: i.quantity + quantity } : i
+              i.variantId === variantId ? { ...i, quantity: i.quantity + quantity } : i
             );
           }
-          return [...prev, { sizeId, quantity }];
+          return [...prev, { variantId, quantity }];
         });
       },
-      updateQuantity: (sizeId, quantity) => {
-        setItems((prev) => prev.map((i) => (i.sizeId === sizeId ? { ...i, quantity } : i)));
+      updateQuantity: (variantId, quantity) => {
+        setItems((prev) => prev.map((i) => (i.variantId === variantId ? { ...i, quantity } : i)));
       },
-      removeItem: (sizeId) => {
-        setItems((prev) => prev.filter((i) => i.sizeId !== sizeId));
+      removeItem: (variantId) => {
+        setItems((prev) => prev.filter((i) => i.variantId !== variantId));
       },
       clearCart: () => setItems([]),
       subtotal: lines.reduce((sum, line) => sum + line.lineTotal, 0),

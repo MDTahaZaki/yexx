@@ -15,9 +15,6 @@ import { OrbitControls, ContactShadows, Instances, Instance } from "@react-three
 import * as THREE from "three";
 import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
 import StaticCanPoster from "./StaticCanPoster";
-import { onCanSpin } from "@/lib/can-spin-bus";
-import { getCanSize, onCanSizeChange } from "@/lib/can-size-bus";
-import type { SizeId } from "@/config/brand";
 
 // Slim 500ml proportions: diameter:height ~= 1:3.2.
 const CAN_HEIGHT = 2.0;
@@ -141,11 +138,12 @@ function buildCanProfile(): CanProfile {
 const { chime: CHIME_PROFILE, lid: LID_PROFILE } = buildCanProfile();
 
 /**
- * Loads the officially released label artwork (public/yexx-label.png) as the
- * wall's map. A full-circumference wrap, artwork centered at u=0.5 — the
- * wall mesh below is rotated 180 degrees so that center faces the camera,
- * the same trick the can's earlier procedural label used. No recoloring, no
- * outline, no restyling: this is the released design, used unchanged.
+ * Loads the label artwork (public/yexx-label-gold.png — the released mark
+ * recolored gold-on-bone for the warm luxury direction, see the sibling
+ * yexx-label.png for the original) as the wall's map. A full-circumference
+ * wrap, artwork centered at u=0.5 — the wall mesh below is rotated 180
+ * degrees so that center faces the camera, the same trick the can's earlier
+ * procedural label used.
  */
 function useLabelTexture(): THREE.Texture | null {
   const { gl } = useThree();
@@ -154,7 +152,7 @@ function useLabelTexture(): THREE.Texture | null {
   useEffect(() => {
     let cancelled = false;
     const loader = new THREE.TextureLoader();
-    loader.load("/yexx-label.png", (loaded) => {
+    loader.load("/yexx-label-gold.png", (loaded) => {
       if (cancelled) return;
       loaded.colorSpace = THREE.SRGBColorSpace;
       loaded.wrapS = THREE.RepeatWrapping;
@@ -225,21 +223,25 @@ function PullTab() {
     <group position={[0, TAB_Y, TAB_OFFSET_Z]}>
       <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
         <torusGeometry args={[TAB_RING_RADIUS, TAB_TUBE_RADIUS, 12, 24]} />
-        <meshStandardMaterial color="#e8e8e8" metalness={0.9} roughness={0.3} />
+        <meshStandardMaterial color="#c6a664" metalness={0.8} roughness={0.28} />
       </mesh>
       <mesh position={[0, TAB_TUBE_RADIUS * 0.4, -TAB_OFFSET_Z * 0.9]} castShadow>
         <sphereGeometry args={[TAB_TUBE_RADIUS * 1.3, 12, 12]} />
-        <meshStandardMaterial color="#e8e8e8" metalness={0.9} roughness={0.3} />
+        <meshStandardMaterial color="#c6a664" metalness={0.8} roughness={0.28} />
       </mesh>
     </group>
   );
 }
 
-// Shared by the chime and the lid — both are bare brushed aluminium, just
-// two separate meshes because they're on either side of the labeled wall.
-const METAL_COLOR = "#ededed";
-const METAL_METALNESS = 0.85;
-const METAL_ROUGHNESS = 0.42;
+// Shared by the chime and the lid — both are brushed gold, just two
+// separate meshes because they're on either side of the labeled wall.
+const METAL_COLOR = "#c6a664";
+const METAL_METALNESS = 0.75;
+const METAL_ROUGHNESS = 0.38;
+// Warm white body — the label map (mostly bone/white, gold only where the
+// mark/wordmark print) is multiplied by this, so this is what actually
+// carries the "warm" in "warm white can," not pure #ffffff.
+const BODY_COLOR = "#f5f0e6";
 
 function Can({ dropletCount }: { dropletCount: number }) {
   const labelTexture = useLabelTexture();
@@ -265,10 +267,10 @@ function Can({ dropletCount }: { dropletCount: number }) {
           faces the camera: the cylinder's u=0 seam sits at +Z by default. */}
       <mesh position={[0, 0, 0]} rotation={[0, Math.PI, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[CAN_RADIUS, CAN_RADIUS, WALL_HEIGHT, CAN_LATHE_SEGMENTS]} />
-        {/* White base so the map shows through unchanged (map colors are
+        {/* Warm-white base so the map shows through tinted (map colors are
             multiplied by this), with enough roughness/metalness for a soft
             sheen rather than flat matte chalk. */}
-        <meshStandardMaterial color="#ffffff" map={labelTexture ?? undefined} roughness={0.45} metalness={0.1} />
+        <meshStandardMaterial color={BODY_COLOR} map={labelTexture ?? undefined} roughness={0.5} metalness={0.06} />
       </mesh>
 
       {/* Lid: shoulder taper, neck, rim lip and concave dish — bare brushed
@@ -307,7 +309,6 @@ function Can({ dropletCount }: { dropletCount: number }) {
 
 const IDLE_SWAY_DEG = 6;
 const IDLE_SWAY_SPEED = 0.9; // rad/s of the sine argument — a slow back-and-forth, not a spin
-const FLOURISH_SPIN_DURATION = 0.7; // seconds for the Shop-triggered 360
 // Subtle continuous life at rest: a slow vertical bob plus a lazy x/z
 // drift at two different, non-multiple speeds so it traces a slow organic
 // wander rather than a back-and-forth line. Small enough (a few percent of
@@ -318,82 +319,21 @@ const DRIFT_AMPLITUDE = 0.02;
 const DRIFT_SPEED_X = 0.17;
 const DRIFT_SPEED_Z = 0.23;
 
-// 250ml is the baseline the camera framing (see CANVAS_CAMERA below) is
-// tuned against. 150ml is shorter and slightly narrower — X and Z share one
-// factor so every horizontal cross-section stays circular (no oval
-// distortion), only Y differs.
-const SIZE_SCALE: Record<SizeId, [number, number, number]> = {
-  "250ml": [1, 1, 1],
-  "150ml": [0.92, 0.8, 0.92],
-};
-const SIZE_SCALE_LERP = 0.1;
-
-/**
- * Owns the can's size (150ml vs 250ml), read from `can-size-bus` — set by
- * the Shop section outside the Canvas — and smoothly lerped rather than
- * snapped. Kept as its own group/useFrame, separate from SpinningCan's
- * rotation and bob/drift, so the two concerns never collide in one function.
- */
-function CanSizeGroup({ dropletCount }: { dropletCount: number }) {
-  const group = useRef<THREE.Group>(null);
-  const targetScale = useRef(SIZE_SCALE[getCanSize()]);
-
-  useEffect(
-    () =>
-      onCanSizeChange((size) => {
-        targetScale.current = SIZE_SCALE[size];
-      }),
-    []
-  );
-
-  useFrame(() => {
-    if (!group.current) return;
-    const [tx, ty, tz] = targetScale.current;
-    group.current.scale.x = THREE.MathUtils.lerp(group.current.scale.x, tx, SIZE_SCALE_LERP);
-    group.current.scale.y = THREE.MathUtils.lerp(group.current.scale.y, ty, SIZE_SCALE_LERP);
-    group.current.scale.z = THREE.MathUtils.lerp(group.current.scale.z, tz, SIZE_SCALE_LERP);
-  });
-
-  return (
-    <group ref={group}>
-      <Can dropletCount={dropletCount} />
-    </group>
-  );
-}
-
 /**
  * Idle motion is a gentle +/-15 degree sway around front-facing, not a
  * continuous rotation — the label must stay readable, not spin away from the
- * viewer. A full 360 is only ever a brief, explicitly-triggered flourish
- * (see `triggerCanSpin`), layered on top of the sway and then handed back to
- * it once complete. A slow bob + drift on position runs alongside the sway
- * so the can never looks frozen at rest.
+ * viewer. A slow bob + drift on position runs alongside the sway so the can
+ * never looks frozen at rest.
  */
 function SpinningCan({ dropletCount }: { dropletCount: number }) {
   const group = useRef<THREE.Group>(null);
-  const flourish = useRef(0); // 0 = idle; while active, counts 0 -> 1 across FLOURISH_SPIN_DURATION
 
-  useEffect(() => onCanSpin(() => {
-    flourish.current = Number.EPSILON; // >0 marks "in progress"; useFrame drives it from here
-  }), []);
-
-  useFrame((state, delta) => {
+  useFrame((state) => {
     if (!group.current) return;
     const t = state.clock.elapsedTime;
     const sway = THREE.MathUtils.degToRad(IDLE_SWAY_DEG) * Math.sin(t * IDLE_SWAY_SPEED);
 
-    let extra = 0;
-    if (flourish.current > 0) {
-      const next = flourish.current + delta / FLOURISH_SPIN_DURATION;
-      if (next >= 1) {
-        flourish.current = 0;
-      } else {
-        flourish.current = next;
-        extra = next * Math.PI * 2;
-      }
-    }
-
-    group.current.rotation.y = sway + extra;
+    group.current.rotation.y = sway;
     group.current.position.y = BOB_AMPLITUDE * Math.sin(t * BOB_SPEED);
     group.current.position.x = DRIFT_AMPLITUDE * Math.sin(t * DRIFT_SPEED_X);
     group.current.position.z = DRIFT_AMPLITUDE * Math.cos(t * DRIFT_SPEED_Z);
@@ -401,7 +341,7 @@ function SpinningCan({ dropletCount }: { dropletCount: number }) {
 
   return (
     <group ref={group}>
-      <CanSizeGroup dropletCount={dropletCount} />
+      <Can dropletCount={dropletCount} />
     </group>
   );
 }
@@ -415,7 +355,7 @@ const SCROLL_TILT_MAX_X_DEG = 4;
  * Reads `scrollProgressRef` each frame (never as a prop that changes
  * identity, never via React state) and lerps rotation toward the target so
  * the motion stays smooth even though the underlying value updates on its
- * own cadence (framer-motion's spring, decoupled from React's render loop).
+ * own cadence (Motion's spring, decoupled from React's render loop).
  *
  * Both axes are clamped hard (12 degrees Y, 4 degrees X) — a product shot at
  * eye level, not a look down into the lid, and never far enough around to
@@ -438,123 +378,6 @@ function TiltGroup({
     group.current.rotation.x = THREE.MathUtils.lerp(group.current.rotation.x, targetX, TILT_LERP);
   });
   return <group ref={group}>{children}</group>;
-}
-
-/** A soft white-to-transparent radial gradient, tunable per use (a wide gentle
- *  falloff for the halo behind the can, a tighter fast one for the floor
- *  reflection). Grey/white/black only — no colour stop is ever introduced. */
-function createRadialGlowTexture(midStop: number, midAlpha: number): THREE.CanvasTexture {
-  const size = 256;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d")!;
-  const r = size / 2;
-  const gradient = ctx.createRadialGradient(r, r, 0, r, r, r);
-  gradient.addColorStop(0, "rgba(255,255,255,0.55)");
-  gradient.addColorStop(midStop, `rgba(255,255,255,${midAlpha})`);
-  gradient.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, size, size);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
-
-/** A soft-edged vertical light beam: opaque at one end, fading to transparent
- *  at the other, with the same fade blurring both side edges. */
-function createShaftTexture(): THREE.CanvasTexture {
-  const width = 128;
-  const height = 512;
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d")!;
-
-  // A flat, exactly-zero dead zone for the first 20% (not just a fade-in
-  // ramp) before rising to peak brightness. The plane's own geometric top
-  // edge sits just outside the camera's visible frustum at this container's
-  // aspect ratio, so without a dead zone the frustum clips straight through
-  // wherever the ramp happens to be — a slow rise only gets asymptotically
-  // close to zero at that fixed clip point, it never reaches it exactly. A
-  // flat zero span guarantees true-zero alpha anywhere within it, with
-  // generous margin over the actual overshoot.
-  const vertical = ctx.createLinearGradient(0, 0, 0, height);
-  vertical.addColorStop(0, "rgba(255,255,255,0)");
-  vertical.addColorStop(0.2, "rgba(255,255,255,0)");
-  vertical.addColorStop(0.55, "rgba(255,255,255,0.9)");
-  vertical.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = vertical;
-  ctx.fillRect(0, 0, width, height);
-
-  ctx.globalCompositeOperation = "destination-in";
-  const horizontal = ctx.createLinearGradient(0, 0, width, 0);
-  horizontal.addColorStop(0, "rgba(255,255,255,0)");
-  horizontal.addColorStop(0.5, "rgba(255,255,255,1)");
-  horizontal.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = horizontal;
-  ctx.fillRect(0, 0, width, height);
-  ctx.globalCompositeOperation = "source-over";
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
-
-/**
- * The three depth cues behind/around the can: a soft glow separating its
- * silhouette from the black background, a faint light shaft matching the key
- * light's upper-right direction, and a fast-fading floor reflection. All
- * three are static (no per-frame uniform updates) and additive/low-opacity,
- * so their cost is a few extra flat-shaded draw calls, not a simulation.
- * Built once via useState's lazy initializer, same rationale as
- * `useLabelTexture`: stable identity, no re-render on mutation.
- */
-function SceneDepthEffects() {
-  const [glowTexture] = useState(() => createRadialGlowTexture(0.4, 0.22));
-  const [reflectionTexture] = useState(() => createRadialGlowTexture(0.18, 0.1));
-  const [shaftTexture] = useState(() => createShaftTexture());
-
-  return (
-    <>
-      <sprite position={[0, 0.05, -0.55]} scale={[2.7, 3.3, 1]} renderOrder={-2}>
-        <spriteMaterial
-          map={glowTexture}
-          transparent
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-          opacity={0.5}
-        />
-      </sprite>
-
-      <mesh
-        position={[0.25, 0.25, -0.3]}
-        rotation={[0, 0, THREE.MathUtils.degToRad(-20)]}
-        renderOrder={-1}
-      >
-        <planeGeometry args={[1.1, 3.6]} />
-        <meshBasicMaterial
-          map={shaftTexture}
-          transparent
-          depthWrite={false}
-          side={THREE.DoubleSide}
-          blending={THREE.AdditiveBlending}
-          opacity={0.22}
-        />
-      </mesh>
-
-      <mesh position={[0, -1.03, 0.1]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>
-        <planeGeometry args={[1.15, 1.7]} />
-        <meshBasicMaterial
-          map={reflectionTexture}
-          transparent
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-          opacity={0.16}
-        />
-      </mesh>
-    </>
-  );
 }
 
 /** A soft dark radial gradient, standing in for a real-time contact shadow on
@@ -608,11 +431,11 @@ function initRectAreaLightUniformsOnce() {
 }
 
 /**
- * A broad, soft fill — a large rect area light rather than another hard
+ * A broad, soft warm fill — a large rect area light rather than another hard
  * directional — so the matte body's curvature reads through gentle,
  * graduated shading across its width instead of one narrow specular streak.
- * The existing directional key light is untouched, so the brushed-aluminium
- * lid still picks up its own distinct, tighter highlight.
+ * The existing upper-left key light is untouched, so the gold rim still
+ * picks up its own distinct, tighter highlight.
  */
 function AreaFillLight() {
   const ref = useRef<THREE.RectAreaLight>(null);
@@ -626,8 +449,8 @@ function AreaFillLight() {
       position={[1.2, 0.8, 3.6]}
       width={4.5}
       height={5.5}
-      intensity={1.2}
-      color="#ffffff"
+      intensity={1}
+      color="#fff4e0"
     />
   );
 }
@@ -645,12 +468,12 @@ function AreaFillLight() {
 // edge, and the near-surface-vs-center depth difference matters at this
 // scale). At 4.1 the can's own silhouette measured to ~75-80% of the
 // container height; recalibrated to 4.9 (inverse-distance estimate) to
-// bring the 250ml can — the size baseline; see SIZE_SCALE above — down to
-// ~65%, per client feedback that the can dominated the hero. Verify against
-// a real screenshot after touching this, not just the math.
+// bring the can down to ~65%, per client feedback that the can dominated
+// the hero. Verify against a real screenshot after touching this, not just
+// the math.
 const CANVAS_CAMERA = { position: [0, 0, 4.9] as [number, number, number], fov: 36 };
 // alpha: true + no scene.background keeps the canvas fully transparent, so
-// the black Hero background reads as one continuous surface behind both the
+// the bone Hero background reads as one continuous surface behind both the
 // text and the can — no separate panel behind the 3D content.
 const CANVAS_GL = { antialias: true, alpha: true };
 const CANVAS_SHADOWS = { type: THREE.PCFShadowMap };
@@ -731,38 +554,35 @@ function EnergyDrinkCan({
         frameloop={paused ? "never" : "always"}
         onCreated={handleCreated}
       >
-        {/* Plain lights instead of an HDRI Environment: no network fetch, no
-            one-time PMREM generation cost. Key upper right, softer fill from
-            the left, rim behind, low ambient — the rims stay bright enough
-            to read as brushed aluminium off the directional highlights. */}
-        <directionalLight position={[3, 4, 2]} intensity={2} color="#ffffff" castShadow />
-        <directionalLight position={[-4, 1.5, 2]} intensity={0.6} color="#e8ecff" />
-        <directionalLight position={[-2, 2, -4]} intensity={1} color="#dfe7ff" />
+        {/* One large soft warm key from the upper left, like a window, plus
+            a gentle warm fill and a little low bounce — nothing theatrical,
+            no HDRI Environment (no network fetch, no one-time PMREM
+            generation cost). Every light is warm-white; there is no cool/
+            blue fill left in the rig. */}
+        <directionalLight position={[-3, 4, 2.5]} intensity={2} color="#fff4e0" castShadow />
+        <directionalLight position={[3, 1.5, 2]} intensity={0.45} color="#ffe9cf" />
+        <directionalLight position={[-1.5, 1.5, -3]} intensity={0.5} color="#ffe9cf" />
         {/* Near-overhead, aimed mostly straight down at the lid's dish and
-            rim — the other three lights sit low enough that their specular
-            hit on the lid's mostly-upward-facing normals is thin. */}
-        <directionalLight position={[0.6, 6, 2.5]} intensity={0.8} color="#ffffff" />
-        {/* Low, forward fill aimed up at the bottom chime — the other lights
-            all sit above the can's center, so its downward-curving surface
-            was the one band still reading black. */}
-        <directionalLight position={[0, -2.5, 3]} intensity={0.55} color="#ffffff" />
-        <ambientLight intensity={0.22} />
+            rim — the other lights sit low enough that their specular hit on
+            the lid's mostly-upward-facing normals is thin. */}
+        <directionalLight position={[-0.6, 6, 2]} intensity={0.6} color="#fff7ea" />
+        {/* Low, forward bounce aimed up at the bottom chime — the other
+            lights all sit above the can's center, so its downward-curving
+            surface was the one band still reading dark. */}
+        <directionalLight position={[0, -2.5, 3]} intensity={0.4} color="#fff4e0" />
+        <ambientLight intensity={0.28} color="#fff7ea" />
         {/* Matte body now carries a real diffuse response to every light
             above (unlike the old near-pure-metal surface), so the whole set
-            is trimmed down from earlier tuning to avoid blowing the fake-
-            metal bands and Y-mark outline out toward flat white. On the
-            reduced mobile tier the RectAreaLight (an LTC-textured light,
-            comparatively expensive) is swapped for a plain directional fill
-            aimed from roughly the same direction. */}
+            is trimmed down from earlier tuning to avoid blowing the gold
+            rim and Y-mark out toward flat white. On the reduced mobile tier
+            the RectAreaLight (an LTC-textured light, comparatively
+            expensive) is swapped for a plain directional fill aimed from
+            roughly the same direction. */}
         {isReduced ? (
-          <directionalLight position={[1.2, 0.8, 3.6]} intensity={0.9} color="#ffffff" />
+          <directionalLight position={[1.2, 0.8, 3.6]} intensity={0.7} color="#fff4e0" />
         ) : (
           <AreaFillLight />
         )}
-
-        {/* Depth cues, back to front: glow behind the can, then the light
-            shaft, then the can itself, then its floor reflection. */}
-        <SceneDepthEffects />
 
         <TiltGroup scrollProgressRef={scrollProgressRef}>
           <SpinningCan dropletCount={isReduced ? REDUCED_DROPLET_COUNT : FULL_DROPLET_COUNT} />

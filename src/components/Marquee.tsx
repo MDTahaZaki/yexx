@@ -6,7 +6,7 @@ function TextRun() {
   return (
     <div className="flex shrink-0 items-center gap-16 pr-16">
       {Array.from({ length: REPEATS }).map((_, i) => (
-        <span key={i} className="text-sm tracking-[0.4em] text-white/25 uppercase">
+        <span key={i} className="text-sm tracking-[0.4em] text-ink/30 uppercase">
           {brand.mantra}
         </span>
       ))}
@@ -21,7 +21,7 @@ function TextRun() {
  */
 export default function Marquee() {
   return (
-    <div className="overflow-hidden border-y border-white/10 bg-black py-6" aria-hidden="true">
+    <div className="overflow-hidden border-y border-gold/20 bg-bone-deep py-6" aria-hidden="true">
       <div className="animate-marquee motion-reduce:animate-none flex w-max">
         <TextRun />
         <TextRun />

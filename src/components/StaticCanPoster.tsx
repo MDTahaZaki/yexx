@@ -9,7 +9,7 @@ export default function StaticCanPoster({ className = "" }: { className?: string
   return (
     <div className={`flex h-full w-full items-center justify-center ${className}`}>
       <Image
-        src="/can-poster.png"
+        src="/can-poster-gold.png"
         alt="YEXX Energy Drink can"
         width={800}
         height={2533}

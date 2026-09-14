@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useReducedMotion, useScroll, useSpring } from "framer-motion";
+import { motion, useReducedMotion, useScroll, useSpring } from "motion/react";
 
 /** A thin bar pinned to the top of the viewport, tracking whole-page scroll progress. */
 export default function ScrollProgressBar() {
@@ -16,7 +16,7 @@ export default function ScrollProgressBar() {
   return (
     <motion.div
       style={{ scaleX: smoothed }}
-      className="fixed inset-x-0 top-0 z-[60] h-[2px] origin-left bg-white/80"
+      className="fixed inset-x-0 top-0 z-[60] h-[2px] origin-left bg-gold"
       aria-hidden="true"
     />
   );

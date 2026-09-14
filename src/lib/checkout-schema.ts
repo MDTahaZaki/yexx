@@ -18,10 +18,10 @@ export type DeliveryInput = z.infer<typeof deliverySchema>;
 export type DeliveryFieldErrors = Partial<Record<keyof DeliveryInput, string>>;
 
 // What the client sends to /api/checkout and re-sends (as a snapshot) to
-// /api/payment/verify — prices are never included, only what the size *is*
-// and how many; the server looks up pricing itself in both routes.
+// /api/payment/verify — prices are never included, only which variant and
+// how many; the server looks up pricing itself in both routes.
 export const checkoutItemSchema = z.object({
-  sizeId: z.string(),
+  variantId: z.string(),
   quantity: z.number().int().positive().max(20),
 });
 
