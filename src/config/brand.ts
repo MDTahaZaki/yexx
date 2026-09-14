@@ -22,6 +22,7 @@ export const brand = {
 // — the logo/wordmark links there instead.
 export const nav = [
   { label: "Shop", href: "/shop" },
+  { label: "Pre-Order", href: "/preorder" },
   { label: "Our Story", href: "/our-story" },
   { label: "Why YEXX", href: "/why-yexx" },
   { label: "Wholesale", href: "/wholesale" },

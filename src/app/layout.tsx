@@ -7,6 +7,7 @@ import Footer from "@/components/Footer";
 import CartDrawer from "@/components/CartDrawer";
 import SmoothScroll from "@/components/SmoothScroll";
 import ScrollProgressBar from "@/components/ScrollProgressBar";
+import { headers } from "next/headers";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
@@ -25,7 +26,12 @@ export const metadata: Metadata = {
   description: "YEXX is more than an energy drink. It's your boost for the moments that matter.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // Set by proxy.ts on every request (it already calls getUser() to make
+  // its own auth decision) — reading it here avoids a second Auth-server
+  // round trip just to pick the Nav's account link on every page load.
+  const signedIn = (await headers()).get("x-user-signed-in") === "1";
+
   return (
     <html
       lang="en"
@@ -35,7 +41,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <CartProvider>
           <SmoothScroll />
           <ScrollProgressBar />
-          <Nav />
+          <Nav accountHref={signedIn ? "/account" : "/account/login"} />
           <CartDrawer />
           <main>{children}</main>
           <Footer />

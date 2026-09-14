@@ -5,9 +5,9 @@ import Link from "next/link";
 import { motion, useAnimation, useReducedMotion } from "motion/react";
 import { nav, brand } from "@/config/brand";
 import { useCart } from "@/lib/cart-context";
-import { CartIcon } from "./icons";
+import { CartIcon, UserIcon } from "./icons";
 
-export default function Nav() {
+export default function Nav({ accountHref }: { accountHref: string }) {
   const [scrolled, setScrolled] = useState(false);
   const { totalCount, openCart } = useCart();
   const shouldReduceMotion = useReducedMotion();
@@ -59,15 +59,25 @@ export default function Nav() {
           ))}
         </ul>
 
-        <button
-          type="button"
-          onClick={openCart}
-          aria-label={`Open cart, ${totalCount} item${totalCount === 1 ? "" : "s"}`}
-          className="flex items-center gap-2 border border-ink/30 px-4 py-2 text-xs tracking-[0.2em] uppercase"
-        >
-          <CartIcon className="h-4 w-4" />
-          <motion.span animate={badgeControls}>{totalCount}</motion.span>
-        </button>
+        <div className="flex items-center gap-3">
+          <Link
+            href={accountHref}
+            aria-label="Account"
+            className="flex items-center border border-ink/30 p-2.5"
+          >
+            <UserIcon className="h-4 w-4" />
+          </Link>
+
+          <button
+            type="button"
+            onClick={openCart}
+            aria-label={`Open cart, ${totalCount} item${totalCount === 1 ? "" : "s"}`}
+            className="flex items-center gap-2 border border-ink/30 px-4 py-2 text-xs tracking-[0.2em] uppercase"
+          >
+            <CartIcon className="h-4 w-4" />
+            <motion.span animate={badgeControls}>{totalCount}</motion.span>
+          </button>
+        </div>
       </nav>
     </header>
   );
