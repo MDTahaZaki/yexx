@@ -40,12 +40,14 @@ export default function Hero() {
       id="top"
       className="relative min-h-screen overflow-hidden bg-bone text-ink"
     >
-      <div className="relative z-10 mx-auto flex max-w-[1400px] flex-col gap-14 px-6 pt-[var(--nav-h)] pb-20 md:px-12 lg:flex-row lg:items-center lg:gap-8 lg:px-20">
+      <div className="relative z-10 mx-auto flex max-w-[1400px] flex-col gap-8 px-6 pt-[var(--nav-h)] pb-20 md:px-12 lg:flex-row lg:items-center lg:px-20">
         {/* Left column. `min-w-0` overrides the flex default of `min-width:
             auto`, which otherwise lets the headline's intrinsic width push
             this column (and the page) wider than the viewport instead of
-            wrapping. */}
-        <div className="flex min-w-0 flex-1 flex-col gap-9">
+            wrapping. A single consistent gap (tighter on mobile, where the
+            whole hero must read as one flow rather than separate fragments)
+            drives the vertical rhythm — no per-item pt-* overrides. */}
+        <div className="flex min-w-0 flex-1 flex-col gap-6 lg:gap-9">
           <p className={`${type.eyebrow} text-gold-deep`}>{brand.tagline}</p>
 
           <MaskedLines
@@ -68,22 +70,26 @@ export default function Hero() {
             ))}
           </ul>
 
-          {/* Pillar badges, stacked down the left */}
-          <ul className="flex flex-col gap-4 pt-2">
+          {/* Pillar badges, stacked down the left. Smaller on mobile so the
+              four-item list doesn't dominate the screen before the can even
+              appears. */}
+          <ul className="flex flex-col gap-3 lg:gap-4">
             {pillars.map((p, i) => {
               const Icon = pillarIcons[i];
               return (
-                <li key={p.id} className="flex items-center gap-4">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-gold/40">
-                    <Icon className="h-4 w-4 text-gold-deep" />
+                <li key={p.id} className="flex items-center gap-3 lg:gap-4">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gold/40 lg:h-10 lg:w-10">
+                    <Icon className="h-3.5 w-3.5 text-gold-deep lg:h-4 lg:w-4" />
                   </span>
-                  <span className="text-sm tracking-wide text-ink/80 uppercase">{p.title}</span>
+                  <span className="text-xs tracking-wide text-ink/80 uppercase lg:text-sm">
+                    {p.title}
+                  </span>
                 </li>
               );
             })}
           </ul>
 
-          <div className="flex flex-wrap items-center gap-8 pt-4">
+          <div className="flex flex-wrap items-center gap-6 lg:gap-8">
             <SweepButton variant="dark" href="/shop">
               Shop Now
             </SweepButton>
@@ -105,20 +111,22 @@ export default function Hero() {
             (clamp, not a fixed pixel value) so the can's container itself
             never overflows a short window — see EnergyDrinkCan's camera
             comment for how the can's size *within* this container is
-            separately tuned. */}
-        <div className="flex flex-1 flex-col items-center gap-3">
-          <div className="relative h-[clamp(260px,48dvh,420px)] w-full lg:h-[clamp(360px,58dvh,640px)]">
+            separately tuned. The volume badge is an overlay anchored to the
+            can's own container (not a separate flex item below it) so it
+            reads as attached to the can, and doesn't add its own line of
+            vertical space to the mobile flow. */}
+        <div className="flex flex-1 flex-col items-center">
+          <div className="relative h-[clamp(240px,46dvh,400px)] w-full lg:h-[clamp(360px,58dvh,640px)]">
             <motion.div
               style={tier === "static" ? { y: parallaxY } : undefined}
               className="h-full w-full"
             >
               <CanScene tier={tier} scrollProgressRef={scrollProgressRef} />
             </motion.div>
+            <span className="absolute inset-x-0 bottom-2 mx-auto w-fit border border-gold/50 bg-bone/80 px-3 py-1 text-[0.65rem] tracking-[0.3em] text-gold-deep uppercase backdrop-blur-sm">
+              {brand.volumeBadge}
+            </span>
           </div>
-          {/* Volume badge — the one size shown in the hero. */}
-          <span className="border border-gold/50 px-3 py-1 text-[0.65rem] tracking-[0.3em] text-gold-deep uppercase">
-            {brand.volumeBadge}
-          </span>
         </div>
       </div>
     </section>

@@ -5,7 +5,8 @@ import { useEffect, useState } from "react";
 /**
  * "full" -> real-time 3D at full quality (desktop-class hardware).
  * "reduced" -> real-time 3D at a lightweight quality tier (typical phones):
- *  fixed dpr, no dynamic shadows, fewer droplets, no particle background.
+ *  dpr capped at 2, no dynamic shadows, fewer droplets, no particle
+ *  background.
  * "static" -> the flat poster only. Reserved for prefers-reduced-motion and
  *  devices reporting fewer than 4 CPU cores, which genuinely can't handle a
  *  live WebGL scene regardless of screen size.

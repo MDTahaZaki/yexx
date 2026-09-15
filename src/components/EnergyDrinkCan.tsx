@@ -478,10 +478,13 @@ const CANVAS_CAMERA = { position: [0, 0, 4.9] as [number, number, number], fov: 
 const CANVAS_GL = { antialias: true, alpha: true };
 const CANVAS_SHADOWS = { type: THREE.PCFShadowMap };
 const DEFAULT_DPR: [number, number] = [1, 1.75];
-// Reduced mobile tier: fixed at 1 regardless of the device's real pixel
-// ratio, since the retina-range upper bound above is what actually strains a
-// phone GPU.
-const REDUCED_DPR: [number, number] = [1, 1];
+// Reduced mobile tier: still capped, but at 2 rather than 1. Modern phones
+// report a devicePixelRatio of 2.5-3.5, so a cap of 1 was rendering at
+// roughly a third of the screen's real resolution and upscaling — visibly
+// blurry. Frame-time cost on phone GPUs is cut elsewhere (no dynamic
+// shadows, fewer droplets, no particle background, no RectAreaLight) so
+// resolution itself doesn't need to be sacrificed too.
+const REDUCED_DPR: [number, number] = [1, 2];
 const CONTEXT_RECOVERY_TIMEOUT_MS = 4000;
 const FULL_DROPLET_COUNT = 60;
 const REDUCED_DROPLET_COUNT = 15;

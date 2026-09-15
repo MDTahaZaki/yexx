@@ -6,6 +6,7 @@ import { motion, useAnimation, useReducedMotion } from "motion/react";
 import { nav, brand } from "@/config/brand";
 import { useCart } from "@/lib/cart-context";
 import { CartIcon, UserIcon } from "./icons";
+import MobileNav from "./MobileNav";
 
 export default function Nav({ accountHref }: { accountHref: string }) {
   const [scrolled, setScrolled] = useState(false);
@@ -60,6 +61,8 @@ export default function Nav({ accountHref }: { accountHref: string }) {
         </ul>
 
         <div className="flex items-center gap-3">
+          <MobileNav accountHref={accountHref} />
+
           <Link
             href={accountHref}
             aria-label="Account"
