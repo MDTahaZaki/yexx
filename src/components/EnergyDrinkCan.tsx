@@ -324,13 +324,37 @@ const DRIFT_SPEED_Z = 0.23;
  * continuous rotation — the label must stay readable, not spin away from the
  * viewer. A slow bob + drift on position runs alongside the sway so the can
  * never looks frozen at rest.
+ *
+ * `suppressRef`, when true, freezes this entirely (no sway, no bob/drift) —
+ * used on the mobile touch-rotate tier so a finger drag doesn't fight the
+ * idle animation for control of the same rotation. Frozen time is tracked
+ * separately from `state.clock.elapsedTime` (which keeps ticking) so motion
+ * resumes exactly where it paused instead of jumping to wherever the sine
+ * wave would otherwise be after the gap.
  */
-function SpinningCan({ dropletCount }: { dropletCount: number }) {
+function SpinningCan({
+  dropletCount,
+  suppressRef,
+}: {
+  dropletCount: number;
+  suppressRef?: RefObject<boolean>;
+}) {
   const group = useRef<THREE.Group>(null);
+  const pausedDurationRef = useRef(0);
+  const lastElapsedRef = useRef(0);
 
   useFrame((state) => {
     if (!group.current) return;
-    const t = state.clock.elapsedTime;
+    const raw = state.clock.elapsedTime;
+    const dt = raw - lastElapsedRef.current;
+    lastElapsedRef.current = raw;
+
+    if (suppressRef?.current) {
+      pausedDurationRef.current += dt;
+      return;
+    }
+
+    const t = raw - pausedDurationRef.current;
     const sway = THREE.MathUtils.degToRad(IDLE_SWAY_DEG) * Math.sin(t * IDLE_SWAY_SPEED);
 
     group.current.rotation.y = sway;
@@ -360,23 +384,286 @@ const SCROLL_TILT_MAX_X_DEG = 4;
  * Both axes are clamped hard (12 degrees Y, 4 degrees X) — a product shot at
  * eye level, not a look down into the lid, and never far enough around to
  * turn the label away from the camera.
+ *
+ * `suppressRef`, when true, skips the update entirely — used on the mobile
+ * touch-rotate tier so scroll tilt doesn't fight a finger drag for the same
+ * rotation. Freezing (rather than resetting) means it resumes the lerp from
+ * wherever it left off, with no jump.
  */
 function TiltGroup({
   scrollProgressRef,
+  suppressRef,
   children,
 }: {
   scrollProgressRef?: RefObject<number>;
+  suppressRef?: RefObject<boolean>;
   children: ReactNode;
 }) {
   const group = useRef<THREE.Group>(null);
   useFrame(() => {
     if (!group.current) return;
+    if (suppressRef?.current) return;
     const progress = THREE.MathUtils.clamp(scrollProgressRef?.current ?? 0, 0, 1);
     const targetY = THREE.MathUtils.degToRad(progress * SCROLL_TILT_MAX_Y_DEG);
     const targetX = THREE.MathUtils.degToRad(progress * -SCROLL_TILT_MAX_X_DEG);
     group.current.rotation.y = THREE.MathUtils.lerp(group.current.rotation.y, targetY, TILT_LERP);
     group.current.rotation.x = THREE.MathUtils.lerp(group.current.rotation.x, targetX, TILT_LERP);
   });
+  return <group ref={group}>{children}</group>;
+}
+
+const DRAG_DECIDE_THRESHOLD_PX = 10;
+// Half the canvas width dragged -> ~180 degrees of rotation.
+const DRAG_RADIANS_PER_PX = (width: number) => (Math.PI * 2) / width;
+const MOMENTUM_DECAY_PER_SEC = 0.05; // velocity multiplier applied over a full second
+const MOMENTUM_STOP_THRESHOLD = 0.02; // rad/s
+const SNAPBACK_TAU_S = 0.4; // exponential time constant -> "settled" around ~1.5s
+const SNAPBACK_STOP_THRESHOLD = 0.01; // rad
+const HINT_DELAY_MS = 1400;
+const HINT_DURATION_S = 1.1;
+const HINT_NUDGE_RAD = THREE.MathUtils.degToRad(14);
+const HINT_SESSION_KEY = "yexx-can-touch-hint-shown";
+
+type TouchPhase = "idle" | "undecided" | "rotating" | "scrolling" | "momentum" | "snapback" | "hint";
+
+interface TouchRotationState {
+  phase: TouchPhase;
+  startX: number;
+  startY: number;
+  dragStartRotation: number;
+  lastMoveTime: number;
+  velocity: number; // rad/s
+  canvasWidth: number;
+}
+
+function readHintShown(): boolean {
+  try {
+    return sessionStorage.getItem(HINT_SESSION_KEY) === "1";
+  } catch {
+    // Storage can throw in locked-down contexts (private browsing limits,
+    // disabled storage) — treat as "already shown" so we fail toward not
+    // nagging rather than retrying every render.
+    return true;
+  }
+}
+
+function markHintShown() {
+  try {
+    sessionStorage.setItem(HINT_SESSION_KEY, "1");
+  } catch {
+    // Nothing to do if storage is unavailable — see readHintShown above.
+  }
+}
+
+/**
+ * Touch-drag rotation for the mobile tier, wrapping TiltGroup/SpinningCan so
+ * it can suppress both while a drag (or its momentum/snap-back) is in
+ * control of the can's yaw. Sits outside both because it owns a single,
+ * separate rotation.y that composes with (rather than fights) the layers
+ * inside it.
+ *
+ * The core problem this solves: a one-finger drag starting on the can is
+ * ambiguous between "rotate the can" and "scroll the page," and phones only
+ * let native scrolling proceed smoothly if we decide fast and get out of the
+ * way. Native touch/pointer events (not R3F's synthetic pointer layer) are
+ * used deliberately, attached directly to the canvas, because disambiguation
+ * needs a non-passive touchmove listener that conditionally calls
+ * preventDefault — R3F's synthetic events don't expose that control.
+ *
+ * State machine per gesture:
+ *  - touchstart: record the start point, go "undecided". Nothing else yet.
+ *  - touchmove, before ~10px of travel: still "undecided", do nothing.
+ *  - touchmove, past ~10px: decide once — horizontal wins ties toward
+ *    "rotating" (preventDefault from here on, drag tracks the finger 1:1);
+ *    otherwise "scrolling" (release for good, canvas' own `touch-action:
+ *    pan-y` lets the browser's native scroll take over).
+ *  - touchend while rotating: "momentum" if the last tracked velocity is
+ *    above a small floor, else straight to "snapback".
+ *  - momentum: exponential velocity decay each frame; once it drops below
+ *    the floor, hand off to snapback.
+ *  - snapback: ease the rotation toward the nearest multiple of a full turn
+ *    (i.e. front-facing) over roughly 1.5s, then settle exactly at 0 and
+ *    hand control back to TiltGroup/SpinningCan.
+ * A second finger landing mid-gesture, or a lift before a rotate was ever
+ * decided, both fall through to snapback rather than leaving the can stuck
+ * at an offset.
+ */
+function TouchRotateGroup({
+  interactionRef,
+  children,
+}: {
+  interactionRef: RefObject<boolean>;
+  children: ReactNode;
+}) {
+  const group = useRef<THREE.Group>(null);
+  const rotationRef = useRef(0);
+  const hintElapsedRef = useRef(0);
+  const stateRef = useRef<TouchRotationState>({
+    phase: "idle",
+    startX: 0,
+    startY: 0,
+    dragStartRotation: 0,
+    lastMoveTime: 0,
+    velocity: 0,
+    canvasWidth: 1,
+  });
+  const { gl } = useThree();
+
+  // gl.domElement is a real <canvas> DOM node; setting its style inside an
+  // effect (restored on cleanup below) is the standard imperative pattern
+  // for it — the same one drei's own OrbitControls uses internally — not a
+  // render-time mutation of React-owned state. react-hooks/immutability
+  // flags it anyway since it's reached through useThree()'s return value.
+  /* eslint-disable react-hooks/immutability */
+  useEffect(() => {
+    const canvas = gl.domElement;
+    // Lets the browser keep handling vertical scroll on its own compositor
+    // thread the moment we decide a gesture is a scroll, instead of that
+    // scroll waiting on our (necessarily non-passive) touchmove listener.
+    const previousTouchAction = canvas.style.touchAction;
+    canvas.style.touchAction = "pan-y";
+    const s = stateRef.current;
+    let hintTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function cancelHint() {
+      if (hintTimer) {
+        clearTimeout(hintTimer);
+        hintTimer = null;
+      }
+      markHintShown();
+      if (s.phase === "hint") {
+        s.phase = "idle";
+      }
+    }
+
+    function onTouchStart(event: TouchEvent) {
+      if (event.touches.length > 1) {
+        // A second finger landing mid-gesture interrupts cleanly rather than
+        // trying to reconcile two contacts into one rotation.
+        if (s.phase === "rotating" || s.phase === "undecided") {
+          s.phase = "snapback";
+        }
+        return;
+      }
+      cancelHint();
+      const touch = event.touches[0];
+      s.startX = touch.clientX;
+      s.startY = touch.clientY;
+      s.lastMoveTime = performance.now();
+      s.velocity = 0;
+      s.canvasWidth = canvas.clientWidth || 1;
+      s.dragStartRotation = rotationRef.current;
+      s.phase = "undecided";
+    }
+
+    function onTouchMove(event: TouchEvent) {
+      if (event.touches.length !== 1) return;
+      const touch = event.touches[0];
+
+      if (s.phase === "undecided") {
+        const dx = touch.clientX - s.startX;
+        const dy = touch.clientY - s.startY;
+        if (Math.abs(dx) < DRAG_DECIDE_THRESHOLD_PX && Math.abs(dy) < DRAG_DECIDE_THRESHOLD_PX) {
+          return;
+        }
+        s.phase = Math.abs(dx) > Math.abs(dy) ? "rotating" : "scrolling";
+        if (s.phase === "rotating") {
+          interactionRef.current = true;
+        }
+      }
+
+      if (s.phase !== "rotating") return; // "scrolling" — hands off entirely
+
+      event.preventDefault();
+      const now = performance.now();
+      const dx = touch.clientX - s.startX;
+      const angle = s.dragStartRotation + dx * DRAG_RADIANS_PER_PX(s.canvasWidth);
+      const dt = Math.max((now - s.lastMoveTime) / 1000, 1 / 240);
+      const instantVelocity = (angle - rotationRef.current) / dt;
+      // Light smoothing so one jittery event doesn't dominate the momentum
+      // handed off at touchend.
+      s.velocity = THREE.MathUtils.lerp(s.velocity, instantVelocity, 0.5);
+      rotationRef.current = angle;
+      s.lastMoveTime = now;
+    }
+
+    function onTouchEnd() {
+      if (s.phase === "rotating") {
+        s.phase = Math.abs(s.velocity) > MOMENTUM_STOP_THRESHOLD ? "momentum" : "snapback";
+      } else if (s.phase === "undecided" || s.phase === "scrolling") {
+        // Covers a tap, and a gesture that resolved to "scrolling" — either
+        // way, make sure the can isn't left stuck off-center from a drag
+        // that got interrupted before this touch began.
+        s.phase = "snapback";
+      }
+    }
+
+    canvas.addEventListener("touchstart", onTouchStart, { passive: true });
+    canvas.addEventListener("touchmove", onTouchMove, { passive: false });
+    canvas.addEventListener("touchend", onTouchEnd, { passive: true });
+    canvas.addEventListener("touchcancel", onTouchEnd, { passive: true });
+
+    if (!readHintShown()) {
+      hintTimer = setTimeout(() => {
+        hintTimer = null;
+        if (s.phase === "idle") {
+          hintElapsedRef.current = 0;
+          s.phase = "hint";
+          interactionRef.current = true;
+        }
+      }, HINT_DELAY_MS);
+    }
+
+    return () => {
+      canvas.style.touchAction = previousTouchAction;
+      canvas.removeEventListener("touchstart", onTouchStart);
+      canvas.removeEventListener("touchmove", onTouchMove);
+      canvas.removeEventListener("touchend", onTouchEnd);
+      canvas.removeEventListener("touchcancel", onTouchEnd);
+      if (hintTimer) clearTimeout(hintTimer);
+    };
+  }, [gl, interactionRef]);
+  /* eslint-enable react-hooks/immutability */
+
+  useFrame((_state, delta) => {
+    if (!group.current) return;
+    const s = stateRef.current;
+
+    if (s.phase === "momentum") {
+      rotationRef.current += s.velocity * delta;
+      s.velocity *= Math.pow(MOMENTUM_DECAY_PER_SEC, delta);
+      if (Math.abs(s.velocity) < MOMENTUM_STOP_THRESHOLD) {
+        s.phase = "snapback";
+      }
+    } else if (s.phase === "snapback") {
+      const target = Math.round(rotationRef.current / (Math.PI * 2)) * Math.PI * 2;
+      rotationRef.current = THREE.MathUtils.lerp(
+        rotationRef.current,
+        target,
+        1 - Math.exp(-delta / SNAPBACK_TAU_S)
+      );
+      if (Math.abs(rotationRef.current - target) < SNAPBACK_STOP_THRESHOLD) {
+        rotationRef.current = 0;
+        s.phase = "idle";
+        interactionRef.current = false;
+      }
+    } else if (s.phase === "hint") {
+      hintElapsedRef.current += delta;
+      const t = Math.min(hintElapsedRef.current / HINT_DURATION_S, 1);
+      rotationRef.current = HINT_NUDGE_RAD * Math.sin(t * Math.PI); // out and back
+      if (t >= 1) {
+        rotationRef.current = 0;
+        s.phase = "idle";
+        interactionRef.current = false;
+        markHintShown();
+      }
+    }
+    // "rotating" needs no per-frame work here — the touchmove handler above
+    // already writes rotationRef.current directly, 1:1 with the finger.
+
+    group.current.rotation.y = rotationRef.current;
+  });
+
   return <group ref={group}>{children}</group>;
 }
 
@@ -514,6 +801,10 @@ function EnergyDrinkCan({
   // dead canvas on screen.
   const [contextFailed, setContextFailed] = useState(false);
   const isReduced = quality === "reduced";
+  // True while a touch drag (or its momentum/snap-back) owns the can's yaw
+  // on the mobile tier — read by TiltGroup and SpinningCan to back off for
+  // the duration, never crosses the Canvas boundary as a prop.
+  const interactionRef = useRef(false);
 
   // Read via a ref rather than a useCallback dependency: `onReady` is an
   // inline arrow function at the call site, and depending on it directly
@@ -587,9 +878,17 @@ function EnergyDrinkCan({
           <AreaFillLight />
         )}
 
-        <TiltGroup scrollProgressRef={scrollProgressRef}>
-          <SpinningCan dropletCount={isReduced ? REDUCED_DROPLET_COUNT : FULL_DROPLET_COUNT} />
-        </TiltGroup>
+        {isReduced ? (
+          <TouchRotateGroup interactionRef={interactionRef}>
+            <TiltGroup scrollProgressRef={scrollProgressRef} suppressRef={interactionRef}>
+              <SpinningCan dropletCount={REDUCED_DROPLET_COUNT} suppressRef={interactionRef} />
+            </TiltGroup>
+          </TouchRotateGroup>
+        ) : (
+          <TiltGroup scrollProgressRef={scrollProgressRef}>
+            <SpinningCan dropletCount={FULL_DROPLET_COUNT} />
+          </TiltGroup>
+        )}
 
         {isReduced ? (
           <SimpleGradientShadow />
@@ -603,9 +902,11 @@ function EnergyDrinkCan({
           />
         )}
 
-        {/* Drag-to-orbit is desktop-only: on the reduced mobile tier a
-            single-finger drag over the can needs to scroll the page, not
-            rotate it. Only the automatic scroll tilt applies on phones. */}
+        {/* OrbitControls (full drag-to-orbit, pinch zoom) stays desktop-only
+            and unchanged. The reduced mobile tier gets its own Y-only touch
+            rotation via TouchRotateGroup above instead — a one-finger drag
+            on a phone must resolve to either "rotate" or "scroll the page,"
+            which OrbitControls' pointer handling doesn't disambiguate. */}
         {!isReduced && (
           <OrbitControls
             enablePan={false}
