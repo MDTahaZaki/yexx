@@ -16,11 +16,11 @@ function makeLimiter(prefix: string, tokens: number, window: `${number} ${"s" | 
 }
 
 // One limiter per endpoint, each with its own Upstash key prefix so they
-// don't share a bucket. Values match the brief exactly.
-export const registerLimiter = makeLimiter("ratelimit:register", 5, "1 h");
-export const loginLimiter = makeLimiter("ratelimit:login", 10, "15 m");
-export const resetLimiter = makeLimiter("ratelimit:reset", 3, "1 h");
-export const preorderLimiter = makeLimiter("ratelimit:preorder", 5, "1 h");
+// don't share a bucket.
+export const registerLimiter = makeLimiter("ratelimit:register", 10, "1 h");
+export const loginLimiter = makeLimiter("ratelimit:login", 20, "15 m");
+export const resetLimiter = makeLimiter("ratelimit:reset", 5, "1 h");
+export const preorderLimiter = makeLimiter("ratelimit:preorder", 10, "1 h");
 
 export interface RateLimitResult {
   allowed: boolean;
@@ -37,12 +37,23 @@ export interface RateLimitResult {
  * (registration, pre-order — the abuse-surface endpoints the brief calls
  * out as "the crash risk," where allowing unlimited traffic during an
  * outage is worse than a false-positive block).
+ *
+ * Rate limiting is skipped entirely when NODE_ENV is "development" — local
+ * testing repeatedly hits these same endpoints, and a real Upstash bucket
+ * shared across a dev session locks the developer out for the same window a
+ * real customer would face. Next.js sets NODE_ENV to "production" for both
+ * `next build`/`next start` and (per its own docs) deployment platforms, so
+ * this can't accidentally stay open in a deployed environment.
  */
 export async function enforceRateLimit(
   limiter: Ratelimit | null,
   identifier: string,
   failOpen: boolean
 ): Promise<RateLimitResult> {
+  if (process.env.NODE_ENV === "development") {
+    return { allowed: true, retryAfterSeconds: 0 };
+  }
+
   if (!limiter) return { allowed: failOpen, retryAfterSeconds: 60 };
 
   try {

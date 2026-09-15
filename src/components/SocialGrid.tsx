@@ -8,15 +8,22 @@ import MaskedLines from "./MaskedLines";
 import Parallax from "./Parallax";
 import RevealImage from "./RevealImage";
 
+// Pre-launch: no customers yet, so this is a product gallery (different
+// crops/angles of the can), not a social wall. No usernames or handles on
+// any tile — the one exception is the dedicated Instagram panel below,
+// which links the client's real account rather than inventing UGC.
 const tiles = [
-  { id: 1, span: "col-span-2 row-span-2", tag: "@yexx_official", image: 0 },
-  { id: 2, span: "col-span-1 row-span-1", tag: "@r.torres", image: 1 },
-  { id: 3, span: "col-span-1 row-span-1", tag: "@leah.k", image: 2 },
-  { id: 4, span: "col-span-1 row-span-2", tag: "@danny_lifts", image: 3 },
+  { id: 1, span: "col-span-2 row-span-2", alt: "YEXX can, full body with Y-mark logo", image: 0 },
+  { id: 2, span: "col-span-1 row-span-1", alt: "YEXX can, lid and rim detail", image: 1 },
+  { id: 3, span: "col-span-1 row-span-1", alt: "YEXX can, wordmark and base detail", image: 2 },
+  { id: 4, span: "col-span-1 row-span-2", alt: "YEXX can, full body, tall crop", image: 3 },
   { id: 5, span: "col-span-2 row-span-1", special: true as const },
-  { id: 6, span: "col-span-1 row-span-1", tag: "@marta.codes", image: 4 },
-  { id: 7, span: "col-span-1 row-span-1", tag: "@jules_runs", image: 5 },
+  { id: 6, span: "col-span-1 row-span-1", alt: "YEXX can, shoulder taper detail", image: 4 },
+  { id: 7, span: "col-span-1 row-span-1", alt: "YEXX can, lower body detail", image: 5 },
 ];
+
+const INSTAGRAM_HANDLE = "@yexxofficial.co";
+const INSTAGRAM_URL = "https://instagram.com/yexxofficial.co";
 
 function TileFrame({
   id,
@@ -43,12 +50,12 @@ function TileFrame({
 function PhotoTile({
   id,
   span,
-  tag,
+  alt,
   image,
 }: {
   id: number;
   span: string;
-  tag: string;
+  alt: string;
   image: number;
 }) {
   const photo = gridImages[image];
@@ -65,7 +72,7 @@ function PhotoTile({
       <RevealImage
         imageProps={{
           src: photo.src,
-          alt: "",
+          alt,
           fill: true,
           sizes: "(min-width: 768px) 25vw, 50vw",
           style: { objectPosition: photo.objectPosition },
@@ -78,31 +85,26 @@ function PhotoTile({
         style={{ backgroundImage: embossTexture }}
         aria-hidden="true"
       />
-
-      {/* Scrim + username: hidden until hover on a mouse, but hover can never
-          fire on a touchscreen, so it's shown by default there instead
-          (pointer: coarse, not a screen-width guess — a touch laptop/tablet
-          at desktop width has the same problem a phone does). */}
-      <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 translate-y-full bg-gradient-to-t from-ink/85 via-ink/30 to-transparent opacity-0 transition-all duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100 pointer-coarse:translate-y-0 pointer-coarse:opacity-100"
-        aria-hidden="true"
-      />
-      <span className="pointer-events-none absolute bottom-3 left-3 translate-y-2 text-[0.65rem] font-light tracking-[0.25em] text-bone/90 uppercase opacity-0 transition-all duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100 pointer-coarse:translate-y-0 pointer-coarse:opacity-100">
-        {tag}
-      </span>
     </TileFrame>
   );
 }
 
-function TagUsTile({ id, span }: { id: number; span: string }) {
+function InstagramTile({ id, span }: { id: number; span: string }) {
   return (
     <TileFrame id={id} span={span}>
-      <div className="flex h-full w-full flex-col items-center justify-center gap-3 border border-gold/30 bg-bone-deep">
+      <a
+        href={INSTAGRAM_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex h-full w-full flex-col items-center justify-center gap-3 border border-gold/30 bg-bone-deep transition-colors duration-300 hover:bg-gold/5"
+      >
         <span className="text-lg font-medium tracking-[0.15em] text-ink uppercase">
           {brand.hashtag}
         </span>
-        <span className="text-[0.65rem] tracking-[0.35em] text-ink/45 uppercase">Tag us</span>
-      </div>
+        <span className="text-[0.65rem] tracking-[0.35em] text-ink/45 uppercase">
+          {INSTAGRAM_HANDLE}
+        </span>
+      </a>
     </TileFrame>
   );
 }
@@ -112,22 +114,17 @@ export default function SocialGrid() {
     <section className={`${layout.section} bg-bone text-ink`}>
       <div className={layout.container}>
         <div className="mb-14 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <MaskedLines
-            as="h2"
-            text={brand.hashtag}
-            className={`${type.h2} font-medium uppercase`}
-            viewport
-          />
-          <p className={`${type.eyebrow} text-ink/50`}>Tag us to be featured</p>
+          <MaskedLines as="h2" text="The Can" className={`${type.h2} font-medium uppercase`} viewport />
+          <p className={`${type.eyebrow} text-ink/50`}>Launching soon — follow along</p>
         </div>
 
         <Parallax rangePx={22}>
           <div className="grid auto-rows-[140px] grid-cols-2 gap-1 grid-flow-row-dense md:grid-cols-4">
             {tiles.map((t) =>
               t.special ? (
-                <TagUsTile key={t.id} id={t.id} span={t.span} />
+                <InstagramTile key={t.id} id={t.id} span={t.span} />
               ) : (
-                <PhotoTile key={t.id} id={t.id} span={t.span} tag={t.tag!} image={t.image!} />
+                <PhotoTile key={t.id} id={t.id} span={t.span} alt={t.alt!} image={t.image!} />
               )
             )}
           </div>

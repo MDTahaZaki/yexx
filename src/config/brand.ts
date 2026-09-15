@@ -92,7 +92,7 @@ export function getNutritionForVolume(volumeMl: number) {
 }
 
 export const socials = [
-  { label: "Instagram", href: "#" }, // TODO(client): real Instagram URL
+  { label: "Instagram", href: "https://instagram.com/yexxofficial.co" },
   { label: "WhatsApp", href: "#" }, // TODO(client): real WhatsApp link, e.g. wa.me/91...
   { label: "X", href: "#" }, // TODO(client): real X URL
 ] as const;
