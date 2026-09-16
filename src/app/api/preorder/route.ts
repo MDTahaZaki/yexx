@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import type { NextRequest } from "next/server";
 import { preorderSchema, preorderEditSchema } from "@/lib/preorder-schema";
 import { createClient } from "@/lib/supabase/server";
@@ -6,6 +6,7 @@ import { sendLead } from "@/lib/send-lead";
 import { sendEmail, preorderConfirmationEmail } from "@/lib/email";
 import { readJsonBody } from "@/lib/read-json-body";
 import { preorderLimiter, enforceRateLimit, getClientIp, formatRetryMessage } from "@/lib/rate-limit";
+import { sanitizeBodyField, containsUrl } from "@/lib/sanitize-text";
 
 const UNIQUE_VIOLATION = "23505";
 
@@ -42,10 +43,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, id: "0" });
   }
 
-  const parsed = preorderSchema.safeParse(body);
+  const parsed = preorderSchema.safeParse(sanitizeBodyField(body, "notes"));
   if (!parsed.success) {
     return NextResponse.json(
       { ok: false, errors: parsed.error.flatten().fieldErrors },
+      { status: 400 }
+    );
+  }
+
+  // Nobody legitimately puts a link in an order note — reject it as a spam
+  // vector rather than storing it.
+  if (parsed.data.notes && containsUrl(parsed.data.notes)) {
+    return NextResponse.json(
+      { ok: false, errors: { notes: ["Links aren't allowed in notes."] } },
       { status: 400 }
     );
   }
@@ -102,12 +112,15 @@ export async function POST(request: NextRequest) {
     consentAt,
   });
 
-  // Email failure must never fail the pre-order itself — sendEmail
-  // already swallows and logs its own errors, so this is fire-and-forget
-  // by construction, not by an extra try/catch here.
+  // Email failure must never fail the pre-order itself — sendEmail already
+  // swallows and logs its own errors. This still needs `after()` rather
+  // than a bare fire-and-forget call: on Vercel, the function can be frozen
+  // the instant the response below is sent, and an un-awaited promise has
+  // no guarantee of running to completion after that. `after()` keeps the
+  // invocation alive until this callback settles.
   if (user.email) {
     const { subject, html } = preorderConfirmationEmail({ size: parsed.data.size, quantity: parsed.data.quantity });
-    void sendEmail({ to: user.email, subject, html });
+    after(() => sendEmail({ to: user.email!, subject, html }));
   }
 
   return NextResponse.json({ ok: true, id: row.id });
@@ -124,10 +137,17 @@ export async function PATCH(request: NextRequest) {
   }
 
   const body = await readJsonBody(request);
-  const parsed = preorderEditSchema.safeParse(body);
+  const parsed = preorderEditSchema.safeParse(sanitizeBodyField(body, "notes"));
   if (!parsed.success) {
     return NextResponse.json(
       { ok: false, errors: parsed.error.flatten().fieldErrors },
+      { status: 400 }
+    );
+  }
+
+  if (parsed.data.notes && containsUrl(parsed.data.notes)) {
+    return NextResponse.json(
+      { ok: false, errors: { notes: ["Links aren't allowed in notes."] } },
       { status: 400 }
     );
   }

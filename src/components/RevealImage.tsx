@@ -2,6 +2,7 @@
 
 import Image, { type ImageProps } from "next/image";
 import { motion, useReducedMotion } from "motion/react";
+import { useRevealed } from "@/lib/use-revealed";
 
 /**
  * Wraps a next/image in a clip-path wipe (bottom -> top, not a fade — wipes
@@ -10,6 +11,13 @@ import { motion, useReducedMotion } from "motion/react";
  * static. Both layers animate `clipPath`/`transform` only, never a layout
  * property, and both collapse to a plain static image under
  * prefers-reduced-motion.
+ *
+ * The reveal is driven by `useRevealed` (native IntersectionObserver + a
+ * fallback timer) and Motion's `animate` prop, never `whileInView` — that
+ * was the production bug that left images fetched but permanently invisible
+ * (the observer never fired, and there was nothing to force the reveal
+ * anyway). `animate` means a failed trigger degrades to "the fallback timer
+ * reveals it a beat late," never "invisible forever."
  */
 export default function RevealImage({
   imageProps,
@@ -33,20 +41,23 @@ export default function RevealImage({
   position?: "relative" | "absolute";
 }) {
   const shouldReduceMotion = useReducedMotion();
+  const [ref, , revealed] = useRevealed<HTMLDivElement>(0.3);
 
   return (
-    <div className={`${position} overflow-hidden ${wrapperClassName}`}>
+    <div ref={ref} className={`${position} overflow-hidden ${wrapperClassName}`}>
       <motion.div
         initial={shouldReduceMotion ? undefined : { clipPath: "inset(100% 0% 0% 0%)" }}
-        whileInView={shouldReduceMotion ? undefined : { clipPath: "inset(0% 0% 0% 0%)" }}
-        viewport={{ once: true, amount: 0.3 }}
+        animate={
+          shouldReduceMotion
+            ? undefined
+            : { clipPath: revealed ? "inset(0% 0% 0% 0%)" : "inset(100% 0% 0% 0%)" }
+        }
         transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
         className="relative h-full w-full"
       >
         <motion.div
           initial={false}
-          whileInView={shouldReduceMotion ? undefined : { scale: 1.06 }}
-          viewport={{ once: true, amount: 0.3 }}
+          animate={shouldReduceMotion ? undefined : { scale: revealed ? 1.06 : 1 }}
           transition={{ duration: scaleDurationSec, ease: "easeOut" }}
           className="relative h-full w-full"
         >

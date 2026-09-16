@@ -3,6 +3,7 @@
 import { motion } from "motion/react";
 import { getNutritionForVolume, type, layout } from "@/config/brand";
 import { featuredProduct } from "@/lib/products";
+import { useRevealed } from "@/lib/use-revealed";
 import MaskedLines from "./MaskedLines";
 import CountUpNumber from "./CountUpNumber";
 import Parallax from "./Parallax";
@@ -10,6 +11,9 @@ import Parallax from "./Parallax";
 export default function Nutrition() {
   const volumeMl = featuredProduct.variants[0].volumeMl;
   const nutrition = getNutritionForVolume(volumeMl);
+  // See RevealImage/Pillars: `whileInView` alone left this table invisible
+  // in production whenever the observer never reported intersection.
+  const [ref, , revealed] = useRevealed<HTMLTableElement>(0.2);
 
   return (
     <section id="formula" className={`${layout.section} bg-bone-deep text-ink`}>
@@ -26,9 +30,9 @@ export default function Nutrition() {
 
         <Parallax rangePx={16}>
         <motion.table
+          ref={ref}
           initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true, amount: 0.2 }}
+          animate={{ opacity: revealed ? 1 : 0 }}
           transition={{ duration: 0.6 }}
           className="w-full border-collapse text-left"
         >

@@ -116,7 +116,14 @@ export default function Hero() {
             reads as attached to the can, and doesn't add its own line of
             vertical space to the mobile flow. */}
         <div className="flex flex-1 flex-col items-center">
-          <div className="relative h-[clamp(240px,46dvh,400px)] w-full lg:h-[clamp(360px,58dvh,640px)]">
+          {/* max-w caps how wide this box can get relative to its own
+              height. The can's camera framing (CANVAS_CAMERA in
+              EnergyDrinkCan) is a fixed vertical FOV tuned against a
+              roughly portrait box — left unconstrained, `w-full` let this
+              column stretch to half the desktop container's width (~600px)
+              against a similar height, so the same can rendered small and
+              adrift in a mostly-empty wide box instead of filling it. */}
+          <div className="relative h-[clamp(240px,46dvh,400px)] w-full max-w-[360px] lg:h-[clamp(360px,58dvh,640px)] lg:max-w-[420px]">
             <motion.div
               style={tier === "static" ? { y: parallaxY } : undefined}
               className="h-full w-full"

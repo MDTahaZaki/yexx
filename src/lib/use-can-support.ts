@@ -17,10 +17,24 @@ export function useCanSupport3D(): CanSupportTier {
   const [tier, setTier] = useState<CanSupportTier>("static");
 
   useEffect(() => {
+    // WebKit caps `navigator.hardwareConcurrency` at 2 on every iOS device
+    // as a fingerprinting mitigation — a brand-new iPhone reports the same
+    // "2" a decade-old one would. Treating that as a genuine low-core
+    // signal silently forced every iPhone (and iPad) onto the static tier,
+    // regardless of how capable the hardware actually is. iOS/iPadOS is
+    // detected and excluded from that specific check; screen size and
+    // prefers-reduced-motion still apply normally there.
+    const isIOS =
+      typeof navigator !== "undefined" &&
+      (/iP(hone|od|ad)/.test(navigator.userAgent) ||
+        // iPadOS reports as "MacIntel" in the UA string but, unlike a real
+        // Mac, has touch points.
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+
     const evaluate = () => {
       const isSmallScreen = window.innerWidth < 768;
       const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      const lowCoreCount = (navigator.hardwareConcurrency ?? 8) < 4;
+      const lowCoreCount = !isIOS && (navigator.hardwareConcurrency ?? 8) < 4;
 
       if (reducedMotion || lowCoreCount) {
         setTier("static");
