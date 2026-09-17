@@ -41,7 +41,7 @@ export const products: Product[] = [
     description:
       "The compact can. Same formula, same clean lift, sized for a shorter session or a first try.",
     images: [
-      { src: "/product/yexx-150ml-can.webp", width: 525, height: 965, alt: "YEXX 150ml can" },
+      { src: "/product/yexx-150ml-can.webp", width: 520, height: 960, alt: "YEXX 150ml can" },
     ],
     // TODO(client): placeholder price — swap for the real 150ml price once confirmed.
     variants: [{ id: "yexx-150ml-can", title: "150 ml Can", price: 69, volumeMl: 150 }],
