@@ -17,9 +17,9 @@ export default function ProductGrid() {
           <Link
             key={product.handle}
             href={`/product/${product.handle}`}
-            className="group flex flex-col items-center gap-6 bg-bone px-8 py-16 text-center transition-colors hover:bg-bone-deep"
+            className="group flex flex-col items-center gap-4 bg-bone px-8 py-10 text-center transition-colors hover:bg-bone-deep"
           >
-            <div className="relative aspect-[3/4] w-full max-w-[220px]">
+            <div className="relative aspect-[3/4] w-full max-w-[320px]">
               <Image
                 src={image.src}
                 alt={image.alt}

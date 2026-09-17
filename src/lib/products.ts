@@ -36,24 +36,26 @@ export interface Product {
 
 export const products: Product[] = [
   {
-    handle: "yexx-250ml",
-    title: "YEXX Energy Drink — 250ml",
-    description:
-      "The full-size can. Clean natural energy, sharp focus, and the endurance to go the distance — brewed to the same spec as every other size, just more of it.",
-    images: [
-      { src: "/product/02_slim_250-gold.png", width: 362, height: 698, alt: "YEXX 250ml can" },
-    ],
-    variants: [{ id: "yexx-250ml-can", title: "250 ml Can", price: 9900, volumeMl: 250 }],
-  },
-  {
     handle: "yexx-150ml",
     title: "YEXX Energy Drink — 150ml",
     description:
       "The compact can. Same formula, same clean lift, sized for a shorter session or a first try.",
     images: [
-      { src: "/product/01_slim_150-gold.png", width: 362, height: 509, alt: "YEXX 150ml can" },
+      { src: "/product/yexx-150ml-can.webp", width: 525, height: 965, alt: "YEXX 150ml can" },
     ],
-    variants: [{ id: "yexx-150ml-can", title: "150 ml Can", price: 6900, volumeMl: 150 }],
+    // TODO(client): placeholder price — swap for the real 150ml price once confirmed.
+    variants: [{ id: "yexx-150ml-can", title: "150 ml Can", price: 69, volumeMl: 150 }],
+  },
+  {
+    handle: "yexx-250ml",
+    title: "YEXX Energy Drink — 250ml",
+    description:
+      "The full-size can. Clean natural energy, sharp focus, and the endurance to go the distance — brewed to the same spec as every other size, just more of it.",
+    images: [
+      { src: "/product/yexx-250ml-can.webp", width: 525, height: 965, alt: "YEXX 250ml can" },
+    ],
+    // TODO(client): placeholder price — swap for the real 250ml price once confirmed.
+    variants: [{ id: "yexx-250ml-can", title: "250 ml Can", price: 99, volumeMl: 250 }],
   },
 ];
 
@@ -70,5 +72,7 @@ export function findVariant(variantId: string): { product: Product; variant: Pro
 }
 
 // The can shown in the home hero and used as the default/featured listing —
-// the 250ml can, per the "Volume badge: 250 ml" brief.
-export const featuredProduct = products[0];
+// the 250ml can, per the "Volume badge: 250 ml" brief. Looked up by handle
+// (not array order) since `products` is ordered small-to-large for the shop
+// grid, not by "featured" status.
+export const featuredProduct = findProduct("yexx-250ml")!;

@@ -11,6 +11,10 @@ export const brand = {
   mantra: "POWER YOUR POTENTIAL",
   hashtag: "#YEXXYOURWAY",
   volumeBadge: "250 ML",
+  // TODO(client): can prices are placeholders (₹69 / ₹99), not real pricing —
+  // see the price fields in src/lib/products.ts, the actual source of truth
+  // for per-variant price (this file only holds brand-wide copy/type/spacing,
+  // not per-product data).
   // Generic on purpose: the two can sizes carry different caffeine amounts
   // (see `nutritionPer100ml`/`getNutritionForVolume`), so a single fixed mg
   // figure would be wrong for one of them.
