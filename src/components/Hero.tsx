@@ -38,7 +38,7 @@ export default function Hero() {
     <section
       ref={sectionRef}
       id="top"
-      className="relative min-h-screen overflow-hidden bg-bone text-ink"
+      className="relative min-h-screen-safe overflow-hidden bg-bone text-ink"
     >
       <div className="relative z-10 mx-auto flex max-w-[1400px] flex-col gap-8 px-6 pt-[var(--nav-h)] pb-20 md:px-12 lg:flex-row lg:items-center lg:px-20">
         {/* Left column. `min-w-0` overrides the flex default of `min-width:

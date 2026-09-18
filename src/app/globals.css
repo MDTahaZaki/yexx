@@ -64,6 +64,24 @@ section[id] {
   scroll-margin-top: var(--nav-h);
 }
 
+/* iOS Safari measures `vh` against the largest possible viewport (chrome
+   collapsed), not what's actually visible on load, so a plain 100vh
+   full-height section overflows and hides its bottom edge behind the
+   toolbar. `dvh` tracks the real visible viewport. The `vh` rule and the
+   `dvh` override are deliberately two separate rules, not one rule with
+   two `min-height` declarations — the build's CSS minifier (Lightning
+   CSS) collapses same-property duplicate declarations down to just the
+   last one, silently deleting the "fallback" declaration it's supposed to
+   be a fallback *for*. `@supports` isn't minified away the same way. */
+.min-h-screen-safe {
+  min-height: 100vh;
+}
+@supports (height: 100dvh) {
+  .min-h-screen-safe {
+    min-height: 100dvh;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

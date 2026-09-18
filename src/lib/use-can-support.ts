@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { isIOS } from "./is-ios";
 
 /**
  * "full" -> real-time 3D at full quality (desktop-class hardware).
@@ -24,17 +25,12 @@ export function useCanSupport3D(): CanSupportTier {
     // regardless of how capable the hardware actually is. iOS/iPadOS is
     // detected and excluded from that specific check; screen size and
     // prefers-reduced-motion still apply normally there.
-    const isIOS =
-      typeof navigator !== "undefined" &&
-      (/iP(hone|od|ad)/.test(navigator.userAgent) ||
-        // iPadOS reports as "MacIntel" in the UA string but, unlike a real
-        // Mac, has touch points.
-        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+    const onIOS = isIOS();
 
     const evaluate = () => {
       const isSmallScreen = window.innerWidth < 768;
       const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      const lowCoreCount = !isIOS && (navigator.hardwareConcurrency ?? 8) < 4;
+      const lowCoreCount = !onIOS && (navigator.hardwareConcurrency ?? 8) < 4;
 
       if (reducedMotion || lowCoreCount) {
         setTier("static");

@@ -4,6 +4,7 @@ import { useState, type RefObject } from "react";
 import dynamic from "next/dynamic";
 import { useInView } from "@/lib/use-in-view";
 import StaticCanPoster from "./StaticCanPoster";
+import CanErrorBoundary from "./CanErrorBoundary";
 import type { CanSupportTier } from "@/lib/use-can-support";
 
 // EnergyDrinkCan pulls in three.js / R3F / drei — keep it out of the initial
@@ -50,12 +51,14 @@ export default function CanScene({ tier, scrollProgressRef }: CanSceneProps) {
       <div
         className={`absolute inset-0 transition-opacity duration-500 ${canvasReady ? "opacity-100" : "opacity-0"}`}
       >
-        <EnergyDrinkCan
-          paused={!inView}
-          quality={tier}
-          scrollProgressRef={scrollProgressRef}
-          onReady={() => setCanvasReady(true)}
-        />
+        <CanErrorBoundary>
+          <EnergyDrinkCan
+            paused={!inView}
+            quality={tier}
+            scrollProgressRef={scrollProgressRef}
+            onReady={() => setCanvasReady(true)}
+          />
+        </CanErrorBoundary>
       </div>
     </div>
   );

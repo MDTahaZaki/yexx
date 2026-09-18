@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { nav, brand } from "@/config/brand";
@@ -20,10 +21,21 @@ const ITEM_VARIANTS = {
  */
 export default function MobileNav({ accountHref }: { accountHref: string }) {
   const [isOpen, setIsOpen] = useState(false);
+  // The menu portals straight to document.body (see the render below) so it
+  // can never land inside an ancestor that creates a containing block for
+  // fixed-position descendants (Nav's header does exactly that once
+  // `backdrop-blur` kicks in on scroll — Safari treats backdrop-filter as
+  // spec says it should, and resolves `fixed inset-0` against that small
+  // header box instead of the viewport, squashing the whole menu). `mounted`
+  // delays the portal until after hydration since `document` doesn't exist
+  // during SSR.
+  const [mounted, setMounted] = useState(false);
   const { totalCount, openCart } = useCart();
   const shouldReduceMotion = useReducedMotion();
   const menuRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
+
+  useEffect(() => setMounted(true), []);
 
   function close() {
     setIsOpen(false);
@@ -91,96 +103,99 @@ export default function MobileNav({ accountHref }: { accountHref: string }) {
         <MenuIcon className="h-5 w-5" />
       </button>
 
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            ref={menuRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Site menu"
-            tabIndex={-1}
-            className="fixed inset-0 z-[60] flex flex-col bg-bone text-ink outline-none md:hidden"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: shouldReduceMotion ? 0 : 0.25 }}
-          >
-            <div className="flex h-[var(--nav-h)] items-center justify-between px-6">
-              <Link
-                href="/"
-                onClick={close}
-                className="text-sm font-medium tracking-[0.3em] uppercase"
-              >
-                {brand.name}
-              </Link>
-              <button
-                type="button"
-                onClick={close}
-                aria-label="Close menu"
-                className="flex h-11 w-11 items-center justify-center"
-              >
-                <CloseIcon className="h-5 w-5" />
-              </button>
-            </div>
-
-            <motion.ul
-              className="flex flex-1 flex-col justify-center gap-1 overflow-y-auto px-8 pb-[var(--nav-h)]"
-              initial="hidden"
-              animate="visible"
-              variants={{
-                visible: {
-                  transition: {
-                    staggerChildren: shouldReduceMotion ? 0 : 0.06,
-                    delayChildren: shouldReduceMotion ? 0 : 0.1,
-                  },
-                },
-              }}
+      {mounted && createPortal(
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div
+              ref={menuRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Site menu"
+              tabIndex={-1}
+              className="fixed inset-0 z-[60] flex flex-col bg-bone text-ink outline-none md:hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: shouldReduceMotion ? 0 : 0.25 }}
             >
-              {nav.map((item) => (
+              <div className="flex h-[var(--nav-h)] items-center justify-between px-6">
+                <Link
+                  href="/"
+                  onClick={close}
+                  className="text-sm font-medium tracking-[0.3em] uppercase"
+                >
+                  {brand.name}
+                </Link>
+                <button
+                  type="button"
+                  onClick={close}
+                  aria-label="Close menu"
+                  className="flex h-11 w-11 items-center justify-center"
+                >
+                  <CloseIcon className="h-5 w-5" />
+                </button>
+              </div>
+
+              <motion.ul
+                className="flex flex-1 flex-col justify-center gap-1 overflow-y-auto px-8 pb-[var(--nav-h)]"
+                initial="hidden"
+                animate="visible"
+                variants={{
+                  visible: {
+                    transition: {
+                      staggerChildren: shouldReduceMotion ? 0 : 0.06,
+                      delayChildren: shouldReduceMotion ? 0 : 0.1,
+                    },
+                  },
+                }}
+              >
+                {nav.map((item) => (
+                  <motion.li
+                    key={item.href}
+                    variants={ITEM_VARIANTS}
+                    transition={{ duration: shouldReduceMotion ? 0 : 0.4, ease: [0.22, 1, 0.36, 1] }}
+                  >
+                    <Link
+                      href={item.href}
+                      onClick={close}
+                      className="flex min-h-[44px] items-center border-b border-gold/20 py-3 text-2xl tracking-wide uppercase"
+                    >
+                      {item.label}
+                    </Link>
+                  </motion.li>
+                ))}
                 <motion.li
-                  key={item.href}
                   variants={ITEM_VARIANTS}
                   transition={{ duration: shouldReduceMotion ? 0 : 0.4, ease: [0.22, 1, 0.36, 1] }}
                 >
                   <Link
-                    href={item.href}
+                    href={accountHref}
                     onClick={close}
-                    className="flex min-h-[44px] items-center border-b border-gold/20 py-3 text-2xl tracking-wide uppercase"
+                    className="flex min-h-[44px] items-center gap-3 border-b border-gold/20 py-3 text-2xl tracking-wide uppercase"
                   >
-                    {item.label}
+                    <UserIcon className="h-5 w-5 text-gold-deep" />
+                    Account
                   </Link>
                 </motion.li>
-              ))}
-              <motion.li
-                variants={ITEM_VARIANTS}
-                transition={{ duration: shouldReduceMotion ? 0 : 0.4, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <Link
-                  href={accountHref}
-                  onClick={close}
-                  className="flex min-h-[44px] items-center gap-3 border-b border-gold/20 py-3 text-2xl tracking-wide uppercase"
+                <motion.li
+                  variants={ITEM_VARIANTS}
+                  transition={{ duration: shouldReduceMotion ? 0 : 0.4, ease: [0.22, 1, 0.36, 1] }}
                 >
-                  <UserIcon className="h-5 w-5 text-gold-deep" />
-                  Account
-                </Link>
-              </motion.li>
-              <motion.li
-                variants={ITEM_VARIANTS}
-                transition={{ duration: shouldReduceMotion ? 0 : 0.4, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <button
-                  type="button"
-                  onClick={handleCartClick}
-                  className="flex min-h-[44px] w-full items-center gap-3 py-3 text-2xl tracking-wide uppercase"
-                >
-                  <CartIcon className="h-5 w-5 text-gold-deep" />
-                  Cart ({totalCount})
-                </button>
-              </motion.li>
-            </motion.ul>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                  <button
+                    type="button"
+                    onClick={handleCartClick}
+                    className="flex min-h-[44px] w-full items-center gap-3 py-3 text-2xl tracking-wide uppercase"
+                  >
+                    <CartIcon className="h-5 w-5 text-gold-deep" />
+                    Cart ({totalCount})
+                  </button>
+                </motion.li>
+              </motion.ul>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import Lenis from "lenis";
+import { isIOS } from "@/lib/is-ios";
 
 /**
  * Smooths wheel/touch scrolling site-wide. Deliberately left at Lenis'
@@ -31,6 +32,15 @@ export default function SmoothScroll() {
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // Lenis drives scroll via a JS rAF loop calling `window.scrollTo` every
+    // frame, which fights iOS Safari's native compositor-driven momentum/
+    // rubber-band scrolling badly enough to make the whole page feel
+    // laggy — Android Chrome tolerates the same technique much better.
+    // Skipping it here leaves iOS on native scrolling entirely; anchor
+    // links below fall back to the browser's own smooth scroll + the
+    // `scroll-margin-top` rule in globals.css, which already exists as
+    // this exact fallback for when JS never runs at all.
+    if (isIOS()) return;
 
     const lenis = new Lenis({
       duration: 1.1,
